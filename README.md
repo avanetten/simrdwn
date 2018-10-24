@@ -7,7 +7,7 @@ ____
 
 ____
 
-###0. Create Docker file
+### 0. Create Docker file
 
 All commands should be run in the docker file, create it via the following commands
 
@@ -24,11 +24,11 @@ Compile the Darkent C program
 
 ____
 
-###1. Prepare Training Data
+### 1. Prepare Training Data
 
 
 
-####   1A. Create YOLT Format
+####  1A. Create YOLT Format
 
 Training data needs to be transformed to the YOLO format of training images in an "images" folder and bounding box labels in a "labels" folder.  For example, an image "images/ex0.png" has a corresponding label "labels/ex0.txt". Labels are bounding boxes of the form 
 
@@ -38,7 +38,7 @@ Where x, y, width, and height are relative to the image's width and height.  Run
 
 We also need to define the object classes with a .pbtxt file, such as **/simrdwn/data/class\_labels\_car.pbtxt**
 
-####   1B. Create .tfrecord (optional)
+####  1B. Create .tfrecord (optional)
 If the tensorflow object detection API models are being run, we must transform the training data into the .tfrecord format.  This is accomplished via the **simrdwn/core/preprocess\_tfrecords.py*** script.
 	
 	python /simrdwn/core/preprocess_tfrecords.py \
