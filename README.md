@@ -1,6 +1,6 @@
 # SIMRDWN
 
-The Satellite Imagery Multiscale Rapid Detection with Windowed Networks (SIMRDWN) codebase combines some of the leading object detection algorithms into a unified framework designed to detect objects both large and small in overhead imagery.  This work seeks to extend the [YOLT](https://arxiv.org/abs/1805.09512) modification of [YOLO](https://pjreddie.com/darknet/yolo/) to include the [TensorFlow Object Detection API](https://github.com/tensorflow/models/tree/master/research/object_detection).  Therefore, one can train models and test on arbitrary image sizes with [YOLO](https://pjreddie.com/darknet/yolo/), [Faster R-CNN](https://arxiv.org/abs/1506.01497), [SSD](https://arxiv.org/abs/1512.02325), or [R-FCN](https://arxiv.org/abs/1605.06409).  Further details on SIMRDWN can be found in our [arXiv paper](https://arxiv.org/abs/1809.09978).
+The Satellite Imagery Multiscale Rapid Detection with Windowed Networks (SIMRDWN) codebase combines some of the leading object detection algorithms into a unified framework designed to detect objects both large and small in overhead imagery.  This work seeks to extend the [YOLT](https://arxiv.org/abs/1805.09512) modification of [YOLO](https://pjreddie.com/darknet/yolo/) to include the [TensorFlow Object Detection API](https://github.com/tensorflow/models/tree/master/research/object_detection).  Therefore, one can train models and test on arbitrary image sizes with [YOLO](https://pjreddie.com/darknet/yolo/), [Faster R-CNN](https://arxiv.org/abs/1506.01497), [SSD](https://arxiv.org/abs/1512.02325), or [R-FCN](https://arxiv.org/abs/1605.06409).  Further details on SIMRDWN can be found in our [arXiv paper](https://arxiv.org/abs/1809.09978).  
 
 ____
 ## Running SIMRDWN
@@ -16,7 +16,7 @@ All commands should be run in the docker file, create it via the following comma
 	nvidia-docker run -it -v /raid:/raid --name simrdwn_train_gpu0 simrdwn
 	
 
-Compile the Darkent C program
+Compile the Darknet C program
 
 	cd /simrdwn/yolt
 	make
@@ -32,7 +32,7 @@ ____
 
 Training data needs to be transformed to the YOLO format of training images in an "images" folder and bounding box labels in a "labels" folder.  For example, an image "images/ex0.png" has a corresponding label "labels/ex0.txt". Labels are bounding boxes of the form 
 
-object-class  x   y   width  height
+	<object-class  x   y   width  height>
 
 Where x, y, width, and height are relative to the image's width and height.  Running a script such as **/simrdwn/core/parse\_cowc.py*** extracts training windows of reasonable size (usually 416 or 544 pixels in extent) from large labeleled images of the [COWC](https://gdo152.llnl.gov/cowc/) dataset.  The script then transforms the labels corresponding to these windows into the correct format and creates a list of all training input images in **/simdwn/data/training\_list.txt**.
 
@@ -145,3 +145,7 @@ During the test phase, input images of arbitrary size are processed.
 	![Alt text](/results/__examples/ex0.png?raw=true "Figure 1")
 	![Alt text](/results/__examples/ex1.png?raw=true "Figure 2")
 	
+	
+This repository supercedes the [YOLT](https://github.com/CosmiQ/yolt) repository.
+	
+_If you plan on using SIMRDWN in your work, please consider citing [YOLO](https://arxiv.org/abs/1612.08242), the [TensorFlow Object Detection API](https://arxiv.org/abs/1611.10012), [YOLT](https://arxiv.org/abs/1805.09512), and [SIMRDWN](https://arxiv.org/abs/1809.09978)._
