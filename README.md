@@ -11,7 +11,7 @@ The Satellite Imagery Multiscale Rapid Detection with Windowed Networks (SIMRDWN
 
 2. Our original [YOLT paper](https://arxiv.org/abs/1805.09512)
 
-3. The (now deprecated) [YOLT repository](https://github.com/CosmiQ/yolt) 
+3. The original [YOLT repository](https://github.com/CosmiQ/yolt) (now deprecated)
  
 
 ____
@@ -46,12 +46,12 @@ Training data needs to be transformed to the YOLO format of training images in a
 
     <object-class> <x> <y> <width> <height>
 
-Where x, y, width, and height are relative to the image's width and height.  Running a script such as **/simrdwn/core/parse\_cowc.py*** extracts training windows of reasonable size (usually 416 or 544 pixels in extent) from large labeleled images of the [COWC](https://gdo152.llnl.gov/cowc/) dataset.  The script then transforms the labels corresponding to these windows into the correct format and creates a list of all training input images in **/simdwn/data/training\_list.txt**.
+Where x, y, width, and height are relative to the image's width and height.  Running a script such as _/simrdwn/core/parse\_cowc.py_ extracts training windows of reasonable size (usually 416 or 544 pixels in extent) from large labeleled images of the [COWC](https://gdo152.llnl.gov/cowc/) dataset.  The script then transforms the labels corresponding to these windows into the correct format and creates a list of all training input images in _/simdwn/data/training\_list.txt_.
 
-We also need to define the object classes with a .pbtxt file, such as **/simrdwn/data/class\_labels\_car.pbtxt**
+We also need to define the object classes with a .pbtxt file, such as _/simrdwn/data/class\_labels\_car.pbtxt_
 
 ####  1B. Create .tfrecord (optional)
-If the tensorflow object detection API models are being run, we must transform the training data into the .tfrecord format.  This is accomplished via the **simrdwn/core/preprocess\_tfrecords.py*** script.
+If the tensorflow object detection API models are being run, we must transform the training data into the .tfrecord format.  This is accomplished via the _simrdwn/core/preprocess\_tfrecords.py_* script.
 	
 	python /simrdwn/core/preprocess_tfrecords.py \
 	    --image_list_file /simrdwn/data/cowc_labels_car_list.txt \
@@ -64,7 +64,7 @@ ____
 
 ### 2. Train
 
-We can train either YOLT models or tensorflow object detection API models.  If we are using tensorflow, the config file may need to be updated in the **/simrdwn/configs** directory (further example config files reside [here](https://github.com/tensorflow/models/tree/master/research/object_detection/samples/configs)).
+We can train either YOLT models or tensorflow object detection API models.  If we are using tensorflow, the config file may need to be updated in the _/simrdwn/configs_ directory (further example config files reside [here](https://github.com/tensorflow/models/tree/master/research/object_detection/samples/configs)).
 Training can be run with commands such as:
 
 	# SSD vehicle search
@@ -111,7 +111,6 @@ During the test phase, input images of arbitrary size are processed.
 
 	
 	
-	
 		# SSD vehicle search
 		python /raid/local/src/simrdwn/src/simrdwn.py \
 			--framework ssd \
@@ -150,10 +149,10 @@ During the test phase, input images of arbitrary size are processed.
 			--plot_thresh_str 0.2 \
 			--slice_sizes_str 416 \
 			--slice_overlap 0.2 \
-			--alpha_scaling 0 \
-			--show_labels 0
+			--alpha_scaling 1 \
+			--show_labels 1
 	
-	Outputs will be something akin to:
+	Outputs will be something akin to the images below.  The _alpha\_scaling_ flag makes the bounding box opacity proportional to prediction confidence, and the _show\_labels_ flag prints the object class at the top of the bounding box.:
 	![Alt text](/results/__examples/ex0.png?raw=true "Figure 1")
 	![Alt text](/results/__examples/ex1.png?raw=true "Figure 2")
 	
