@@ -152,7 +152,7 @@ During the test phase, input images of arbitrary size are processed.
 			--alpha_scaling 1 \
 			--show_labels 1
 	
-	Outputs will be something akin to the images below.  The _alpha\_scaling_ flag makes the bounding box opacity proportional to prediction confidence, and the _show\_labels_ flag prints the object class at the top of the bounding box.:
+	Outputs will be something akin to the images below.  The _alpha\_scaling_ flag makes the bounding box opacity proportional to prediction confidence, and the _show\_labels_ flag prints the object class at the top of the bounding box.
 	![Alt text](/results/__examples/ex0.png?raw=true "Figure 1")
 	![Alt text](/results/__examples/ex1.png?raw=true "Figure 2")
 	
