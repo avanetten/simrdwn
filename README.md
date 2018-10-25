@@ -51,7 +51,7 @@ Where x, y, width, and height are relative to the image's width and height.  Run
 We also need to define the object classes with a .pbtxt file, such as _/simrdwn/data/class\_labels\_car.pbtxt_
 
 ####  1B. Create .tfrecord (optional)
-If the tensorflow object detection API models are being run, we must transform the training data into the .tfrecord format.  This is accomplished via the _simrdwn/core/preprocess\_tfrecords.py_* script.
+If the tensorflow object detection API models are being run, we must transform the training data into the .tfrecord format.  This is accomplished via the _simrdwn/core/preprocess\_tfrecords.py_ script.
 	
 	python /simrdwn/core/preprocess_tfrecords.py \
 	    --image_list_file /simrdwn/data/cowc_labels_car_list.txt \
