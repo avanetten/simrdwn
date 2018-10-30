@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 import argparse
 import shapely
+import shutil
 import cv2
 import os
 
@@ -242,6 +243,8 @@ def main():
     # general settings
     parser.add_argument('--truth_dir', type=str, default='/cosmiq/cowc/datasets/ground_truth_sets/Utah_AGRC',
                         help="Location of  ground truth labels")
+    parser.add_argument('--simrdwn_data_dir', type=str, default='/cosmiq/simrdwn/data/',
+                        help="Location of  ground truth labels")
     parser.add_argument('--image_dir', type=str, default='',
                         help="Location of  images, look in truth dir if == ''")
     parser.add_argument('--out_dir', type=str, default='',
@@ -268,6 +271,18 @@ def main():
                      yolt_box_size=args.input_box_size,
                      outfile_df=outfile_df,
                      verbose=verbose)
+                    
+    # create image list
+    yolt_im_list_loc = os.path.join(args.out_dir, 'cowc_training_list.txt')
+    im_ext = '.png'
+    print ("\nsave image list to:", yolt_im_list_loc)
+    with open(yolt_im_list_loc, 'w') as file_handler:
+        for item in os.listdir(args.image_dir):
+            if item.endswith(im_ext):
+                outpath_tmp = os.path.join(args.image_dir, item)
+                file_handler.write("{}\n".format(outpath_tmp))
+    # copy image list to simrdwn_data_dir
+    shutil.copy2(yolt_im_list_loc, args.simrdwn_data_dir)
                      
 
 ###############################################################################
@@ -275,9 +290,10 @@ if __name__ == "__main__":
     main()
 
 '''
-python /Users/avanetten/Documents/cosmiq/simrdwn/core/parse_cowc.py \
-    --truth_dir=/Users/avanetten/Documents/cosmiq/cowc/datasets/ground_truth_sets/Utah_AGRC \
-    --image_dir=/Users/avanetten/Documents/cosmiq/simrdwn/test_images/cowc_utah_raw_0p3GSD \
+python /cosmiq/simrdwn/core/parse_cowc.py \
+    --truth_dir=/cosmiq/cowc/datasets/ground_truth_sets/Utah_AGRC \
+    --simrwn_data_dir=/cosmiq/simrdwn/data \
+    --image_dir=/cosmiq/simrdwn/test_images/cowc_utah_raw_0p3GSD \
     --input_box_size=10 \
     --verbose=1
 
