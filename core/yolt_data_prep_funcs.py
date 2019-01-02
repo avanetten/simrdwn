@@ -14,7 +14,7 @@ import os
 import sys
 import cv2
 import math
-import shutilo
+import shutil
 import numpy as np
 import pandas as pd
 import json

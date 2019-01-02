@@ -15,7 +15,7 @@ MAINTAINER Adam Van Etten
 
 # cd /raid/local/src/simrdwn/docker
 # nvidia-docker build --no-cache -t simrdwn .
-# nvidia-docker run -it -v /raid:/raid --name simrdwn simrdwn
+# NV_GPU=0 nvidia-docker run -it -v /raid:/raid --name simrdwn_gpu0 simrdwn
 
 
 ###################
@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
         libopencv-dev \
         python-opencv \
-		python-tk \
+	python-tk \
         build-essential autoconf libtool libcunit1-dev \
         libproj-dev libgdal-dev libgeos-dev libjson0-dev vim python-gdal \
     	# requirements for keras
@@ -66,6 +66,7 @@ RUN pip --no-cache-dir install \
         sklearn \
 	pandas \
 	h5py \
+	shapely \
         && \
     python -m ipykernel.kernelspec
 
