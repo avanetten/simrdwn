@@ -10,8 +10,6 @@ https://github.com/tensorflow/models/blob/master/research/object_detection/datas
 
 https://va-vsrv-github.a.internal/Cosmiq/spacenetTensorflow/blob/master/create_geojson_airplane_tf_record_updated.py
 
-
-
 https://github.com/chiphuyen/stanford-tensorflow-tutorials/blob/master/examples/09_tfrecord_example.py
 
 def get_image_binary(filename):
@@ -47,6 +45,7 @@ import time
 ### Dataset utils
 # https://github.com/tensorflow/models/blob/master/research/object_detection/utils/dataset_util.py
 #import sys
+#path_to_utils = '/Users/avanetten/Documents/cosmiq/git/tensorflow_models-master/research/object_detection/utils'
 #sys.path.append(path_to_utils)
 #import dataset_util
 
@@ -176,7 +175,7 @@ def yolt_to_tf_example(image_file, label_file,
   
   Tensorflow object detection api requires jpeg format !
   
-  convert_dict is maps yolt internal labels to the integers for .pbtxt 
+  convert_dict maps yolt internal labels to the integers for .pbtxt 
   
   """
   
@@ -449,13 +448,14 @@ def main():
     verbose = True
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image_list_file', type=str, default='/cosmiq/qgis_labels/parse_shapefile/outputs/qgis_labels_car_boat_plane_list.txt',  
+    #parser.add_argument('--image_list_file', type=str, default='/Users/avanetten/Documents/cosmiq/simrdwn/test_list.txt',
+    parser.add_argument('--image_list_file', type=str, default='/Users/avanetten/Documents/cosmiq/qgis_labels/parse_shapefile/outputs/qgis_labels_car_boat_plane_list.txt',  
                       help="File holding locations of image files")
-    parser.add_argument('--outfile', type=str, default='/cosmiq/simrdwn/data/qgis_labels_car_boat_plane.tfrecord',
+    parser.add_argument('--outfile', type=str, default='/Users/avanetten/Documents/cosmiq/simrdwn/data/qgis_labels_car_boat_plane.tfrecord',
                         help="Output file location")
-    parser.add_argument('--outfile_val', type=str, default='/cosmiq/simrdwn//data/qgis_labels_car_boat_plane_val.tfrecord',
+    parser.add_argument('--outfile_val', type=str, default='/Users/avanetten/Documents/cosmiq/simrdwn//data/qgis_labels_car_boat_plane_val.tfrecord',
                         help="Output validation file location")
-    parser.add_argument('--pbtxt_filename', type=str, default='/cosmiq/simrdwn/data/class_labels_airplane_boat_car.pbtxt',
+    parser.add_argument('--pbtxt_filename', type=str, default='/Users/avanetten/Documents/cosmiq/simrdwn/data/class_labels_airplane_boat_car.pbtxt',
                         help="Class dictionary")
     parser.add_argument('--val_frac', type=float, default=0.1,
                         help="Fraction of items to reserve for validation") 
@@ -500,7 +500,44 @@ def main():
     elif args.pbtxt_filename.endswith('class_labels_airport.pbtxt'):
         convert_dict = {0:  1,  # airport
                    }
+    # usually we just want to increase the number by one
+    else:
+        convert_dict = {x:x+1 for x in range(100)}
+        #convert_dict = {0:  1,  
+        #                1:  2,     
+        #                2:  3,     
+        #                3:  4,     
+        #                4:  5,     
+        #                5:  6,     
+        #                6:  7,     
+        #                7:  8,     
+        #                8:  9,     
+        #                9:  10
+        #           }
+        
 
+    #label_map_dict = {0:    'airplane',
+    #                  1:    'airport',
+    #                  2:    'boat',
+    #                  3:    'boat_harbor',
+    #                  4:    'car'}
+    
+    ##out_dir =   '/Users/avanetten/Documents/cosmiq/simrdwn/'    
+    ## make temporary image list to test out yolt_imlist_to_tf()
+    #image_dir = '/Users/avanetten/Documents/cosmiq/qgis_labels/parse_shapefile/outputs/WV03_03102015_R1C2/images'
+    #image_list_file = os.path.join(outdir, 'test_list.txt')
+    #file_out = open(image_list_file, "w")
+    #im_list = os.listdir(image_dir)
+    #for im in im_list:
+    #    path_tot = os.path.join(image_dir, im)
+    #    #line_out = path_tot.replace('|', '\|') + '\n'
+    #    line_out = path_tot + '\n'
+    #    file_out.write(line_out)
+    #    #print("line_out:", line_out)
+    #file_out.close()
+    
+        
+    #yolt_dir_to_tf(image_dir, label_map_dict, TF_RecordPath, verbose=verbose)
     yolt_imlist_to_tf(args.image_list_file, label_map_dict, args.outfile,
                       TF_PathVal=args.outfile_val, val_frac=args.val_frac, 
                       convert_dict=convert_dict, verbose=verbose)  
@@ -514,7 +551,7 @@ if __name__ == '__main__':
 
 
 '''
-python /cosmiq/simrdwn/core/preprocess_tfrecords.py \
+python /raid/local/src/simrdwn/core/preprocess_tfrecords.py \
     --image_list_file /raid/local/src/simrdwn/data/qgis_labels_airplane_boat_car_devbox_list2.txt \
     --pbtxt_filename /raid/local/src/simrdwn/data/class_labels_airplane_boat_car.pbtxt \
     --outfile /raid/local/src/simrdwn/data/qgis_labels_airplane_boat_car_train2.tfrecord \
