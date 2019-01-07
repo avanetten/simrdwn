@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       	build-essential \
         curl \
         git \
-	cmake \
+		cmake \
         rsync \
         software-properties-common \
         unzip \
@@ -39,14 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
         libopencv-dev \
         python-opencv \
-	python-tk \
+		python-tk \
         build-essential autoconf libtool libcunit1-dev \
         libproj-dev libgdal-dev libgeos-dev libjson0-dev vim python-gdal \
     	# requirements for keras
     	python-h5py \
     	python-yaml \
     	python-pydot \
-	graphviz \
+		graphviz \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -57,17 +57,18 @@ RUN curl -fSsL -O https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py && \
     rm get-pip.py
 RUN pip --no-cache-dir install \
-	protobuf \
-        ipykernel \
-        jupyter \
-        matplotlib \
-        numpy \
-        scipy \
-        sklearn \
-	pandas \
-	h5py \
-	shapely \
-        && \
+		protobuf \
+		ipykernel \
+    	jupyter \
+    	matplotlib \
+    	numpy \
+    	scipy \
+    	sklearn \
+		scikit-image \
+		pandas \
+		h5py \
+		shapely \
+    	&& \
     python -m ipykernel.kernelspec
 
 
