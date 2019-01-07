@@ -19,21 +19,21 @@ import numpy as np
 import pandas as pd
 import json
 import glob
-import pickle
 import time 
 import random
 import subprocess
 import operator
+#import pickle
 #import tifffile as tiff
 from skimage import exposure
 import matplotlib
 from matplotlib.collections import PolyCollection
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 from subprocess import Popen, PIPE, STDOUT
-from matplotlib.collections import PatchCollection
-from osgeo import gdal, osr, ogr, gdalnumeric
-from matplotlib.patches import Polygon
+#from matplotlib.collections import PatchCollection
+from osgeo import gdal, osr, ogr #, gdalnumeric
+#from matplotlib.patches import Polygon
 
 #import geopandas as gpd
 #import rasterio as rio
@@ -42,32 +42,48 @@ from matplotlib.patches import Polygon
 #import gdal
 #import os
 
-
 #import random
 #import time
 #import pickle
 #from PIL import Image
 
-path_root = '/raid/local/src'
 
+###############################################################################
+# FROM YOLT/SCRIPS/CONVERT.PY
+def convert(size, box):
+    '''Input = image size: (w,h), box: [x0, x1, y0, y1]'''
+    dw = 1./size[0]
+    dh = 1./size[1]
+    xmid = (box[0] + box[1])/2.0
+    ymid = (box[2] + box[3])/2.0
+    w0 = box[1] - box[0]
+    h0 = box[3] - box[2]
+    x = xmid*dw
+    y = ymid*dh
+    w = w0*dw
+    h = h0*dh
+    return (x,y,w,h)
+    
+###############################################################################
+# FROM YOLT/SCRIPS/CONVERT.PY
+def convert_reverse(size, box):
+    '''Back out pixel coords from yolo format
+    input = image_size (w,h), 
+        box = [x,y,w,h]'''
+    x,y,w,h = box
+    dw = 1./size[0]
+    dh = 1./size[1]
+    
+    w0 = w/dw
+    h0 = h/dh
+    xmid = x/dw
+    ymid = y/dh
+    
+    x0, x1 = xmid - w0/2., xmid + w0/2.
+    y0, y1 = ymid - h0/2., ymid + h0/2.
 
-yolt_dir = os.path.join(path_root, 'yolt2/')
-sys.path.append(yolt_dir + 'scripts')
-import convert, slice_im
-reload(convert)
-reload(slice_im)
-   
-# import functions
-sys.path.append(os.path.join(root_dir, 'sivnet/src/')) 
-import sivnet_data_prep
-reload(sivnet_data_prep)
-from sivnet_data_prep import get_contours, plot_contours
-path_to_spacenet_utils = 'https://github.com/avanetten/spacenet_buildings_exploration'
-sys.path.extend([path_to_spacenet_utils])
-import spacenet_utilities
-sys.path.append(yolt_dir + 'scripts/')
-
-
+    return [x0, x1, y0, y1]
+    
 
 
 ###############################################################################
@@ -193,6 +209,109 @@ def pair_im_vec_spacenet_v2(rasterSrc, vecDir, new_schema=False):
     
     return vectorSrc
 
+
+###############################################################################    
+def geojson_to_pixel_arr(raster_file, geojson_file, acceptable_categories=[],
+                         pixel_ints=True,
+                         verbose=False):
+    '''
+    adapted from https://github.com/avanetten/spacenet_buildings_exploration
+    specifically for poi data
+    Tranform geojson file into array of points in pixel (and latlon) coords
+    pixel_ints = 1 sets pixel coords as integers
+    '''
+    
+    # load geojson file
+    with open(geojson_file) as f:
+        geojson_data = json.load(f)
+    
+    if len(acceptable_categories) > 0:
+        acc_cat_set = set(acceptable_categories)
+    else:
+        acc_cat_set = set([])
+
+    # load raster file and get geo transforms
+    src_raster = gdal.Open(raster_file)
+    targetsr = osr.SpatialReference()
+    targetsr.ImportFromWkt(src_raster.GetProjectionRef())
+        
+    geom_transform = src_raster.GetGeoTransform()
+    if verbose:
+        print ("geom_transform:", geom_transform )
+    
+    # get latlon coords
+    latlons = []
+    poly_types = []
+    categories = []
+    for feature in geojson_data['features']:
+        coords_tmp = feature['geometry']['coordinates'][0]
+        poly_type_tmp = feature['geometry']['type']
+        cat_tmp = feature['properties']['spaceNetFeature']
+        if verbose: 
+            print ("features:", feature.keys() )
+            print ("geometry:features:", feature['geometry'].keys() )
+            #print "feature['geometry']['coordinates'][0]", z
+        # save only desired categories
+        if acc_cat_set:
+            if cat_tmp in acc_cat_set:
+                latlons.append(coords_tmp)
+                poly_types.append(poly_type_tmp)
+                categories.append(cat_tmp)
+        # else save all categories
+        else:
+            latlons.append(coords_tmp)
+            poly_types.append(poly_type_tmp)
+            categories.append(cat_tmp)        
+    
+    # convert latlons to pixel coords
+    pixel_coords = []
+    latlon_coords = []
+    for i, (cat, poly_type, poly0) in enumerate(zip(categories, poly_types, latlons)):
+        
+        if poly_type.upper() == 'POLYGON':
+            poly=np.array(poly0)
+            if verbose:
+                print ("poly.shape:", poly.shape )
+                
+            # account for nested arrays
+            if len(poly.shape) == 3 and poly.shape[0] == 1:
+                poly = poly[0]
+                
+            poly_list_pix = []
+            poly_list_latlon = []
+            if verbose: 
+                print ("poly", poly )
+            for coord in poly:
+                if verbose: 
+                    print ("coord:", coord )
+                lon, lat, z = coord 
+                #px, py = gT.latlon2pixel(lat, lon, input_raster=src_raster, 
+                px, py = latlon2pixel(lat, lon, input_raster=src_raster, 
+                                     targetsr=targetsr, 
+                                     geom_transform=geom_transform)
+                poly_list_pix.append([px, py])
+                if verbose:
+                    print ("px, py", px, py )
+                poly_list_latlon.append([lat, lon])
+            
+            if pixel_ints:
+                ptmp = np.rint(poly_list_pix).astype(int)
+            else:
+                ptmp = poly_list_pix
+            pixel_coords.append(ptmp)
+            latlon_coords.append(poly_list_latlon)
+            
+        elif poly_type.upper() == 'POINT':
+            print ("Skipping shape type: POINT in geojson_to_pixel_arr()" )
+            continue
+        
+        else:
+            print ("Unknown shape type:", poly_type, " in geojson_to_pixel_arr()" )
+            return
+            
+    return categories, pixel_coords, latlon_coords
+
+
 ###############################################################################
 def get_yolt_coords_spacenet(rasterSrc, vecDir, new_schema=False,
                              pixel_ints=True, dl=0.8, verbose=False):
@@ -229,7 +348,7 @@ def get_yolt_coords_spacenet(rasterSrc, vecDir, new_schema=False,
         print ("  vectorSrc:", vectorSrc )
         print ("  rasterSrc.shape:", (h,w,bands))
 
-    pixel_coords, latlon_coords = spacenet_utilities.geojson_to_pixel_arr(rasterSrc, 
+    pixel_coords, latlon_coords = geojson_to_pixel_arr(rasterSrc, 
                                                        vectorSrc, 
                                                        pixel_ints=pixel_ints,
                                                        verbose=verbose)
@@ -449,115 +568,120 @@ def spacenet_yolt_setup(building_list, classes_dic, im_input_dir,
             count, time.time() - t0, "seconds" )
  
 
-###############################################################################        
-def spacenet_yolt_setup_v0(building_list, classes_dic, labels_dir, images_dir,
-                        sample_label_vis_dir, train_images_list_file_loc,
-                        deploy_dir,  dl=0.8):
-    
-    list_file = open(train_images_list_file_loc, 'wb')
-                
-    '''
-    Set up yolt training data, take output of get_yolt_coords_spacenet()
-    as input.  
-    dl =  fraction of size for bounding box
-    '''
-    
-    t0 = time.time()
-    yolt_list = []
-    count = 0
-    for i,row in enumerate(building_list):
-        
-        if (i % 50) == 0:
-            print (i, "/", len(building_list))
-            
-        [name_root0, rasterSrc, vectorSrc, maskSrc, pixel_coords, latlon_coords] = row
-        # get size
-        h,w = cv2.imread(rasterSrc,0).shape
-    
-        cont_plot_box = []
-        yolt_coords = []
-        # get extent of building footprint
-        
-        # skip empty scenes
-        if len(pixel_coords) == 0:
-            yolt_list.append([name_root0, rasterSrc, vectorSrc, maskSrc, \
-                          [], []])
-            continue
-
-        count += 1
-        for c in pixel_coords:
-            carr = np.array(c)
-            xs, ys = carr[:,0], carr[:,1]
-            minx, maxx = np.min(xs), np.max(xs)
-            miny, maxy = np.min(ys), np.max(ys)
-            
-#            # take histogram of coordinate counts and use that to estimate
-#            # best bounding box (this doesn't work all that well if the 
-#            # point are not uniformly distrbuted about the polygon)
-#            #xmid, ymid = np.mean(xs), np.mean(ys)
-#            x0 = np.percentile(xs, 15)
-#            x1 = np.percentile(xs, 85)
-#            y0 = np.percentile(ys, 15)
-#            y1 = np.percentile(ys, 85)
-            
-            # midpoint 
-            xmid, ymid = np.mean([minx,maxx]), np.mean([miny,maxy])
-            dx = dl*(maxx - minx) / 2
-            dy = dl*(maxy - miny) / 2
-            x0 = xmid - dx
-            x1 = xmid + dx
-            y0 = ymid - dy
-            y1 = ymid + dy
-            
-            row = [[x0, y0],
-                   [x0, y1],
-                   [x1, y1],
-                   [x1, y0]]
-            cont_plot_box.append(np.rint(row).astype(int))
-
-                    
-            yolt_row = convert.convert((w,h), [x0,x1,y0,y1])
-            yolt_coords.append(yolt_row)
-    
-        # write to files
-        # copy input image to correct dir
-        shutil.copy(rasterSrc, images_dir)
-        # write yolt label to file
-
-        txt_outpath = labels_dir + name_root0 + '.txt'
-        txt_outfile = open(txt_outpath, "w")
-        for bb in yolt_coords:
-            category = 'building'
-            cls_id = classes_dic[category]
-            outstring = str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n'
-            #print "outstring:", outstring
-            txt_outfile.write(outstring)
-        txt_outfile.close()               
-            
-        # make maskplots
-        if i < 10 and len(maskSrc) > 0:
-            plot_name = sample_mask_vis_dir + name_root0 + '_mask.png'
-            vis = cv2.imread(maskSrc, 0)
-            im_tmp = cv2.imread(rasterSrc, 1)
-            plot_contours(im_tmp, vis, vis,    
-                      contours=[], cont_plot=cont_plot_box, figsize=(8,8), 
-                      plot_name=plot_name)
-            
-            
-        yolt_list.append([name_root0, rasterSrc, vectorSrc, maskSrc,
-                          cont_plot_box, yolt_coords])
-        
-        # create list of training image locations
-        list_file.write('%s/%s.tif\n'%(deploy_dir, name_root0))
-
-       
-    list_file.close()        
-    print ("building list has length:", len(building_list), "though only", \
-            count, "images were processed, the remainder are empty" )
-    print ("Time to setup training data for:", images_dir, "of length:", \
-            len(yolt_list), time.time() - t0, "seconds" )
-        
-    return yolt_list
+################################################################################
+## import functions
+#sys.path.append(os.path.join(root_dir, 'sivnet/src/')) #'/Users/avanetten/Documents/cosmiq/sivnet/src/')
+#import sivnet_data_prep
+#from sivnet_data_prep import get_contours, plot_contours
+################################################################################        
+#def spacenet_yolt_setup_v0(building_list, classes_dic, labels_dir, images_dir,
+#                        sample_label_vis_dir, train_images_list_file_loc,
+#                        deploy_dir,  dl=0.8):
+#    
+#    list_file = open(train_images_list_file_loc, 'wb')
+#                
+#    '''
+#    Set up yolt training data, take output of get_yolt_coords_spacenet()
+#    as input.  
+#    dl =  fraction of size for bounding box
+#    '''
+#    
+#    t0 = time.time()
+#    yolt_list = []
+#    count = 0
+#    for i,row in enumerate(building_list):
+#        
+#        if (i % 50) == 0:
+#            print (i, "/", len(building_list))
+#            
+#        [name_root0, rasterSrc, vectorSrc, maskSrc, pixel_coords, latlon_coords] = row
+#        # get size
+#        h,w = cv2.imread(rasterSrc,0).shape
+#    
+#        cont_plot_box = []
+#        yolt_coords = []
+#        # get extent of building footprint
+#        
+#        # skip empty scenes
+#        if len(pixel_coords) == 0:
+#            yolt_list.append([name_root0, rasterSrc, vectorSrc, maskSrc, \
+#                          [], []])
+#            continue
+#
+#        count += 1
+#        for c in pixel_coords:
+#            carr = np.array(c)
+#            xs, ys = carr[:,0], carr[:,1]
+#            minx, maxx = np.min(xs), np.max(xs)
+#            miny, maxy = np.min(ys), np.max(ys)
+#            
+##            # take histogram of coordinate counts and use that to estimate
+##            # best bounding box (this doesn't work all that well if the 
+##            # point are not uniformly distrbuted about the polygon)
+##            #xmid, ymid = np.mean(xs), np.mean(ys)
+##            x0 = np.percentile(xs, 15)
+##            x1 = np.percentile(xs, 85)
+##            y0 = np.percentile(ys, 15)
+##            y1 = np.percentile(ys, 85)
+#            
+#            # midpoint 
+#            xmid, ymid = np.mean([minx,maxx]), np.mean([miny,maxy])
+#            dx = dl*(maxx - minx) / 2
+#            dy = dl*(maxy - miny) / 2
+#            x0 = xmid - dx
+#            x1 = xmid + dx
+#            y0 = ymid - dy
+#            y1 = ymid + dy
+#            
+#            row = [[x0, y0],
+#                   [x0, y1],
+#                   [x1, y1],
+#                   [x1, y0]]
+#            cont_plot_box.append(np.rint(row).astype(int))
+#
+#                    
+#            yolt_row = convert((w,h), [x0,x1,y0,y1])
+#            yolt_coords.append(yolt_row)
+#    
+#        # write to files
+#        # copy input image to correct dir
+#        shutil.copy(rasterSrc, images_dir)
+#        # write yolt label to file
+#
+#        txt_outpath = labels_dir + name_root0 + '.txt'
+#        txt_outfile = open(txt_outpath, "w")
+#        for bb in yolt_coords:
+#            category = 'building'
+#            cls_id = classes_dic[category]
+#            outstring = str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n'
+#            #print "outstring:", outstring
+#            txt_outfile.write(outstring)
+#        txt_outfile.close()               
+#            
+#        # make maskplots
+#        if i < 10 and len(maskSrc) > 0:
+#            plot_name = sample_mask_vis_dir + name_root0 + '_mask.png'
+#            vis = cv2.imread(maskSrc, 0)
+#            im_tmp = cv2.imread(rasterSrc, 1)
+#            plot_contours(im_tmp, vis, vis,    
+#                      contours=[], cont_plot=cont_plot_box, figsize=(8,8), 
+#                      plot_name=plot_name)
+#            
+#            
+#        yolt_list.append([name_root0, rasterSrc, vectorSrc, maskSrc,
+#                          cont_plot_box, yolt_coords])
+#        
+#        # create list of training image locations
+#        list_file.write('%s/%s.tif\n'%(deploy_dir, name_root0))
+#
+#       
+#    list_file.close()        
+#    print ("building list has length:", len(building_list), "though only", \
+#            count, "images were processed, the remainder are empty" )
+#    print ("Time to setup training data for:", images_dir, "of length:", \
+#            len(yolt_list), time.time() - t0, "seconds" )
+#        
+#    return yolt_list
 
 
 ###############################################################################
@@ -627,7 +751,7 @@ def yolt_labels_to_bbox(label_loc, w, h):
     for yolt_box in z.values:
         cat_int = int(yolt_box[0])
         yb = yolt_box[1:]
-        box0 = convert.convert_reverse(shape, yb)
+        box0 = convert_reverse(shape, yb)
         # convert to int
         box1 = [int(round(b,2)) for b in box0]
         [xmin, xmax, ymin, ymax] = box1
@@ -728,7 +852,7 @@ def plot_training_bboxes(label_folder, image_folder, ignore_augment=True,
             cat_int = int(yolt_box[0])
             color = colors[cat_int]
             yb = yolt_box[1:]
-            box0 = convert.convert_reverse(shape, yb)
+            box0 = convert_reverse(shape, yb)
             # convert to int
             box1 = [int(round(b,2)) for b in box0]
             [xmin, xmax, ymin, ymax] = box1
@@ -825,6 +949,7 @@ def comb_3band_8band(band3_file, band8_file, w0, h0,
     '''
     combine 3 band and 8 band images
     assume 8 band file is ordered by wavelength:
+        file:///Users/avanetten/Documents/cosmiq/papers/dg_worldview2_ds_prod-1.pdf
         coastal, blue, green, yellow, red, red_edge, nearIR1, nearIR2
     assume 3 band file is ordered as RGB
     can't just use the output of ReadAsArray() since the array has different 
@@ -1273,106 +1398,6 @@ def convertTo8Bit(rasterImageName, outputRaster,
 
 ###############################################################################
           
-###############################################################################    
-def geojson_to_pixel_arr(raster_file, geojson_file, acceptable_categories=[],
-                         pixel_ints=True,
-                         verbose=False):
-    '''
-    adapted from spacenet_utilites in git/ave
-    specifically for poi data
-    Tranform geojson file into array of points in pixel (and latlon) coords
-    pixel_ints = 1 sets pixel coords as integers
-    '''
-    
-    # load geojson file
-    with open(geojson_file) as f:
-        geojson_data = json.load(f)
-    
-    if len(acceptable_categories) > 0:
-        acc_cat_set = set(acceptable_categories)
-    else:
-        acc_cat_set = set([])
-
-    # load raster file and get geo transforms
-    src_raster = gdal.Open(raster_file)
-    targetsr = osr.SpatialReference()
-    targetsr.ImportFromWkt(src_raster.GetProjectionRef())
-        
-    geom_transform = src_raster.GetGeoTransform()
-    if verbose:
-        print ("geom_transform:", geom_transform )
-    
-    # get latlon coords
-    latlons = []
-    poly_types = []
-    categories = []
-    for feature in geojson_data['features']:
-        coords_tmp = feature['geometry']['coordinates'][0]
-        poly_type_tmp = feature['geometry']['type']
-        cat_tmp = feature['properties']['spaceNetFeature']
-        if verbose: 
-            print ("features:", feature.keys() )
-            print ("geometry:features:", feature['geometry'].keys() )
-            #print "feature['geometry']['coordinates'][0]", z
-        # save only desired categories
-        if acc_cat_set:
-            if cat_tmp in acc_cat_set:
-                latlons.append(coords_tmp)
-                poly_types.append(poly_type_tmp)
-                categories.append(cat_tmp)
-        # else save all categories
-        else:
-            latlons.append(coords_tmp)
-            poly_types.append(poly_type_tmp)
-            categories.append(cat_tmp)        
-    
-    # convert latlons to pixel coords
-    pixel_coords = []
-    latlon_coords = []
-    for i, (cat, poly_type, poly0) in enumerate(zip(categories, poly_types, latlons)):
-        
-        if poly_type.upper() == 'POLYGON':
-            poly=np.array(poly0)
-            if verbose:
-                print ("poly.shape:", poly.shape )
-                
-            # account for nested arrays
-            if len(poly.shape) == 3 and poly.shape[0] == 1:
-                poly = poly[0]
-                
-            poly_list_pix = []
-            poly_list_latlon = []
-            if verbose: 
-                print ("poly", poly )
-            for coord in poly:
-                if verbose: 
-                    print ("coord:", coord )
-                lon, lat, z = coord 
-                #px, py = gT.latlon2pixel(lat, lon, input_raster=src_raster, 
-                px, py = latlon2pixel(lat, lon, input_raster=src_raster, 
-                                     targetsr=targetsr, 
-                                     geom_transform=geom_transform)
-                poly_list_pix.append([px, py])
-                if verbose:
-                    print ("px, py", px, py )
-                poly_list_latlon.append([lat, lon])
-            
-            if pixel_ints:
-                ptmp = np.rint(poly_list_pix).astype(int)
-            else:
-                ptmp = poly_list_pix
-            pixel_coords.append(ptmp)
-            latlon_coords.append(poly_list_latlon)
-            
-        elif poly_type.upper() == 'POINT':
-            print ("Skipping shape type: POINT in geojson_to_pixel_arr()" )
-            continue
-        
-        else:
-            print ("Unknown shape type:", poly_type, " in geojson_to_pixel_arr()" )
-            return
-            
-    return categories, pixel_coords, latlon_coords
 
 
 ###############################################################################
@@ -1446,7 +1471,7 @@ def get_yolt_coords_poi(rasterSrc, vecDir, new_schema=False,
         x1 = xmid + dx
         y0 = ymid - dy
         y1 = ymid + dy
-        yolt_row = convert.convert((w,h), [x0,x1,y0,y1])
+        yolt_row = convert((w,h), [x0,x1,y0,y1])
         yolt_coords.append(yolt_row)
         
         row = [[x0, y0],
@@ -1492,7 +1517,7 @@ def pixel_coords_to_yolt(pixel_coords, w, h, dl=0.8):
         x1 = xmid + dx
         y0 = ymid - dy
         y1 = ymid + dy
-        yolt_row = convert.convert((w,h), [x0,x1,y0,y1])
+        yolt_row = convert((w,h), [x0,x1,y0,y1])
         yolt_coords.append(yolt_row)
         
         row = [[x0, y0],
