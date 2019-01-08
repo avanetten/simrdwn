@@ -13,7 +13,7 @@ MAINTAINER Adam Van Etten
 # https://github.com/tensorflow/tensorflow/issues/16268
 # error in export graph, edit 
 # vi /opt/tensorflow-models/research/object_detection/exporter.py
-#  line 71 to say:
+#  change line 71 to say:
 #    rewrite_options = rewriter_config_pb2.RewriterConfig()
 ##############################################
 
