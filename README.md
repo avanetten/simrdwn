@@ -3,7 +3,7 @@
 
 ![Alt text](/results/__examples/header.jpg?raw=true "")
 
-The Satellite Imagery Multiscale Rapid Detection with Windowed Networks (SIMRDWN) codebase combines some of the leading object detection algorithms into a unified framework designed to detect objects both large and small in overhead imagery.  This work seeks to extend the [YOLT](https://arxiv.org/abs/1805.09512) modification of [YOLO](https://pjreddie.com/darknet/yolo/) to include the [TensorFlow Object Detection API](https://github.com/tensorflow/models/tree/master/research/object_detection).  Therefore, one can train models and test on arbitrary image sizes with [YOLO](https://pjreddie.com/darknet/yolo/), [Faster R-CNN](https://arxiv.org/abs/1506.01497), [SSD](https://arxiv.org/abs/1512.02325), or [R-FCN](https://arxiv.org/abs/1605.06409).  
+The Satellite Imagery Multiscale Rapid Detection with Windowed Networks (SIMRDWN) codebase combines some of the leading object detection algorithms into a unified framework designed to rapidly detect objects both large and small in overhead imagery of arbitrary size.  This work seeks to extend the [YOLT](https://arxiv.org/abs/1805.09512) modification of [YOLO](https://pjreddie.com/darknet/yolo/) to include the [TensorFlow Object Detection API](https://github.com/tensorflow/models/tree/master/research/object_detection).  Therefore, one can train models and test on arbitrary image sizes with [YOLO](https://pjreddie.com/darknet/yolo/), [Faster R-CNN](https://arxiv.org/abs/1506.01497), [SSD](https://arxiv.org/abs/1512.02325), or [R-FCN](https://arxiv.org/abs/1605.06409).  
 
 ### For more information, see:
 
@@ -133,7 +133,7 @@ We can train either YOLT models or tensorflow object detection API models. Commo
 		
 
 The training script will create a results directory in _/simrdwn/results_ with the filename [framework] + [outname] + [date].  Since one cannot run TensorBoard with YOLT, we include scripts _/simrdwn/core/yolt_plot_loss.py_ and _/simrdwn/core/tf_plot_loss.py_ thatcan be called during training to inspect model convergence.  An example convergence plot is shown below.
-![Alt text](/results/__examples/tf_plot_loss.png?raw=true "Figure 1")
+![Alt text](/results/__examples/tf_loss_plot.png?raw=true "Figure 1")
 
 ____
 
