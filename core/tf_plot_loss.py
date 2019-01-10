@@ -42,9 +42,9 @@ def plot_loss(df, figsize=(8,6), batchsize=64,
     ylim = (0.9*np.min(loss), np.percentile(loss, ylim_perc_max))
     
     if verbose:
-        print "batch:", batch
-        print "loss:", loss
-        print "ylim:", ylim
+        print ("batch:", batch)
+        print ("loss:", loss)
+        print ("ylim:", ylim)
     
     # plot
     fig, (ax) = plt.subplots(1, 1, figsize=(1*figsize[0], figsize[1]))        
@@ -107,6 +107,10 @@ def main():
                         help="csv separator")
     parser.add_argument('--verbose', type=int, default=0,
                         help="verbose if == 1")
+    #parser.add_argument('--batchsize', type=int, default=8,
+    #                    help="Training epochs")
+    #parser.add_argument('--N_train_ims', type=int, default=2418,
+    #                    help="Number of images in training corpus")
     args = parser.parse_args()
 
     verbose = bool(args.verbose)
@@ -133,7 +137,7 @@ def main():
     # set plot name
     plot_file = os.path.join(log_dir, 'tf_loss_plot.png')
     loss_file_p = os.path.join(log_dir, 'tf_loss_for_plotting.txt')
-    print "loss_file_p:", loss_file_p
+    print ("loss_file_p:", loss_file_p)
 
     # copy file because it's probably being actively written to
     #cmd = 'cp ' + loss_file + ' ' + loss_file_p

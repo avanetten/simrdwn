@@ -60,10 +60,12 @@ def update_args(args):
     # append '/' to end of simrdwn_dir
     #if not args.yolt_dir.endswith('/'): args.yolt_dir += '/'
     #if not args.simrdwn_dir.endswith('/'): args.simrdwn_dir += '/'
-    args.src_dir = os.path.join(args.simrdwn_dir, 'core')
+    #args.src_dir = os.path.join(args.simrdwn_dir, 'core')
+    args.src_dir = os.path.dirname(os.path.realpath(__file__)) 
+    args.simrdwn_dir = os.path.dirname(args.src_dir) 
     args.this_file = os.path.join(args.src_dir, 'simrdwn.py')
     args.results_topdir = os.path.join(args.simrdwn_dir, 'results')
-    args.test_images_dir = os.path.join(args.simrdwn_dir + 'test_images')
+    args.test_images_dir = os.path.join(args.simrdwn_dir, 'test_images')
     args.data_dir = os.path.join(args.simrdwn_dir, 'data')
     args.yolt_dir = os.path.join(args.simrdwn_dir, 'yolt')
     args.yolt_weight_dir = os.path.join(args.yolt_dir, 'input_weights')
@@ -1928,7 +1930,7 @@ def main():
 
 
     # Defaults that rarely should need changed
-    parser.add_argument('--simrdwn_dir', type=str, default='/raid/local/src/simrdwn/',
+    parser.add_argument('--simrdwn_dir', type=str, default='/raid/simrdwn/',
                         help="path to package /cosmiq/yolt2/ ")  
     parser.add_argument('--multi_band_delim', type=str, default='#',
                         help="Delimiter for multiband data")

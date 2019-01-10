@@ -3,7 +3,7 @@
 """
 Created on Tue Jan 16 15:05:43 2018
 
-@author: ave
+@author: avanetten
 """
 
 from __future__ import print_function
@@ -12,7 +12,8 @@ from osgeo import ogr
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
+#import matplotlib
+#import random
 import pickle
 import math
 import time
@@ -150,6 +151,10 @@ def augment_df(df,
     # parse out image root and location
     im_roots, im_locs = [], []
     for j,f in enumerate(df['Image_Root_Plus_XY'].values):
+        
+        if (j % 10000) == 0:
+            print (j)
+        
         ext = f.split('.')[-1]
         # get im_root, (if not slicing ignore '|')
         if slice_sizes[0] > 0:
@@ -182,7 +187,7 @@ def augment_df(df,
     df['Im_Width'] = [float(sl.split('_')[5].split('.')[0]) for sl in df['Slice_XY'].values]
     df['Im_Height'] = [float(sl.split('_')[6].split('.')[0]) for sl in df['Slice_XY'].values]
     
-    # set image path, make sure the image exists
+    print ("  set image path, make sure the image exists...")
     im_paths_list = []
     im_roots_update = []
     for ftmp in df['Image_Root'].values:
@@ -211,7 +216,7 @@ def augment_df(df,
     #df['Image_Path'] = [os.path.join(valid_testims_dir_tot, f.strip()) for f
     #                    in df['Image_Root'].values]
 
-    # add in global location of each row
+    print ("  add in global location of each row")
     # if slicing, get global location from filename
     if slice_sizes[0] > 0:
         x0l, x1l, y0l, y1l = [], [], [], []
@@ -271,6 +276,8 @@ def post_process_yolt_valid_create_df(yolt_valid_classes_files, log_file,
         # u'Height', u'Width', u'Pad', u'Image_Path'],
         # dtype='object')
         
+    # test
+    #args.yolt_valid_classes_files = ['/cosmiq/yolt2/results/valid_yolt2_explore1_cfg=ave_19x19_2017_04_25_22-47-05/building.txt']
     '''
  
     # parse out files, create df
@@ -816,35 +823,6 @@ def non_max_suppression(boxes, overlapThresh):
     
     return outboxes, outboxes_tot, pick
 
-###############################################################################
-def building_polys_to_csv(image_name, building_name, coords, conf=0, 
-                          asint=True, rotate_boxe=True):
-    '''
-    for spacenet data
-    coords should have format [[x0, y0], [x1, y1], ... ]
-    Outfile should have format: 
-            ImageId,BuildingId,PolygonWKT_Pix,Confidence
-            https://gis.stackexchange.com/questions/109327/convert-list-of-coordinates-to-ogrgeometry-or-wkt
-            https://pcjericks.github.io/py-gdalogr-cookbook/geometry.html
-    '''
-                
-    if asint:
-        coords = np.array(coords).astype(int)
-            
-    ring = ogr.Geometry(ogr.wkbLinearRing)
-    for coord in coords:
-        ring.AddPoint(coord[0], coord[1])
-    # add first point to close polygon
-    ring.AddPoint(coords[0][0], coords[0][1])
-    
-    poly = ogr.Geometry(ogr.wkbPolygon)
-    poly.AddGeometry(ring)
-    
-    wktpoly = poly.ExportToWkt()
-    
-    row = [image_name, building_name, wktpoly, conf]
-    return row
-
 
 ###############################################################################
 def refine_df(df, groupby='Loc_Tmp', 
@@ -993,26 +971,34 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
                  show_labels=True, alpha_scaling=True, plot_line_thickness=2, 
                  legend_root='00_colormap_legend.png',
                  plot=True, skip_empty=False, print_iter=1, n_plots=100000,
-                 verbose=True):
+                 building_csv_file='',
+                 shuffle_ims=False, verbose=True):
            
-    '''Plot refined dataframe'''
+    '''Plot refined dataframe}'''
 
     print ("Running plot_refined_df...")
     t0 = time.time()
     # get colormap, if plotting
     outfile_legend = os.path.join(outdir, legend_root)
     colormap, color_dict = make_color_legend(outfile_legend, label_map_dict)
-
+    
     # group by image, and plot
-    group = df.groupby(groupby)
+    if shuffle_ims:
+        group = df.groupby(groupby, sort=False)
+    else:
+        group = df.groupby(groupby)
     #print_iter = 1
     for i,g in enumerate(group):
         
         # break if we already met the number of plots to create
-        if i >= n_plots:
+        if (i >= n_plots) and (len(building_csv_file) == 0):
             break
         
         img_loc_string = g[0]
+        
+        #if '740351_3737289' not in img_loc_string:
+        #    continue
+        
         data_all_classes = g[1] 
         image = cv2.imread(img_loc_string, 1)
         
@@ -1038,7 +1024,9 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
 
         boxes = np.stack((ymins, xmins, ymaxs, xmaxs), axis=1)
 
-        plot_rects(image, boxes, scores, classes=classes,
+        # make plots if we are below the max
+        if i < n_plots:
+            plot_rects(image, boxes, scores, classes=classes,
                   plot_thresh=plot_thresh, 
                   color_dict=color_dict, #colormap=colormap,
                   outfile=outfile,
@@ -1046,10 +1034,13 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
                   alpha_scaling=alpha_scaling,
                   plot_line_thickness=plot_line_thickness,
                   verbose=verbose)
+        
+
 
     t1 = time.time()
     print ("Time to run plot_refined_df():", t1-t0, "seconds")
     return
+
 
 
 ###############################################################################
@@ -1179,7 +1170,7 @@ def refine_and_plot_df(df, groupby='Loc_Tmp', label_map_dict={},
                 out_list.append([img_loc_string, score, x0, y0, x1, y1, class_str, image_root])
             
             classes_str = np.array(len(scores) * [class_str])
-            image_roots = np.array(len(scores) * [image_root])
+            #image_roots = np.array(len(scores) * [image_root])
             
             # add to image values
             classes_im.extend(classes_str)
@@ -1414,6 +1405,11 @@ def make_color_legend(outfile, label_map_dict, auto_assign_colors=True,
     if auto_assign_colors:
         # automatically assign colors?
         cmap = plt.cm.get_cmap('jet', len(list(label_map_dict.keys())))
+        # sometimes label_map_dict starts at 1, instead of 0
+        if min(list(label_map_dict.keys())) == 1:
+            idx_plus_val = 1
+        else:
+            idx_plus_val = 0
         colormap = []
         color_dict = {}
         for i in range(cmap.N):
@@ -1422,7 +1418,7 @@ def make_color_legend(outfile, label_map_dict, auto_assign_colors=True,
             #cmaplist.append(hexa)
             rgb_tuple = tuple([int(255*z) for z in rgb])
             colormap.append(rgb_tuple)
-            color_dict[label_map_dict[i]] = rgb_tuple
+            color_dict[label_map_dict[i + idx_plus_val]] = rgb_tuple
             
         #for key in label_map_dict.keys():
         #    itmp = key
