@@ -68,7 +68,7 @@ Training data needs to be initially transformed to the YOLO format of training i
 
     <object-class> <x> <y> <width> <height>
 
-Where x, y, width, and height are relative to the image's width and height.  Running a script such as:
+Where x, y, width, and height are relative to the image's width and height. Object-class is a zero-indexed integer. Running a script such as:
 
 	python /raid/simrdwn/core/prep_data_cowc.py 
 
