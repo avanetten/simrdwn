@@ -21,20 +21,29 @@ ____
 
 ____
 
-### 0. Create Docker file
+### 0. Installation
 
-All commands should be run in a docker image, which can be created via: 
+SIMRDWN is built to execute within a docker container on a GPU-enabled machine.  The docker command creates an Ubuntu 16.04 image with CUDA 9.0, python 3.6, and tensorflow-gpu version 1.13.1. 
 
-	cd /simrdwn/docker
-	nvidia-docker build --no-cache -t simrdwn .
+1. Clone this repository (e.g. to _/simrdwn_)
+
+2. Install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker)
+ 
+3. Build docker file.
+
+		cd /simrdwn/docker
+		nvidia-docker build --no-cache -t simrdwn .
 	
-The docker command creates an Ubuntu 16.04 image with CUDA 9.0, python 3.6, and tensorflow-gpu version 1.13.1.  Now we can spin up a docker container (see the [docker docs](https://docs.docker.com/engine/reference/commandline/run/) for options) and compile the Darknet C program for both YOLT2 and YOLT3.
+4. Spin up the docker container (see the [docker docs](https://docs.docker.com/engine/reference/commandline/run/) for options) 
+
+        nvidia-docker run -it -v /simrdwn://simrdwn --name simrdwn_container0 simrdwn
+	
+5. Coompile the Darknet C program for both YOLT2 and YOLT3.
       
-      nvidia-docker run -it -v /path/to/simrdwn:/path/to/simrdwn --name simrdwn_container0 simrdwn
-      cd /simrdwn/yolt2
-      make
-      cd /simrdwn/yolt3
-      make
+	    cd /simrdwn/yolt2
+	    make
+	    cd /simrdwn/yolt3
+	    make
 
 
 ____
