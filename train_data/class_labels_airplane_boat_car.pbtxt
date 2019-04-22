@@ -1,0 +1,14 @@
+item {
+  id: 1
+  name: 'airplane'
+}
+
+item {
+  id: 2
+  name: 'boat'
+}
+
+item {
+  id: 3
+  name: 'car'
+}

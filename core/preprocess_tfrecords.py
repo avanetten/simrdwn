@@ -10,6 +10,11 @@ https://github.com/tensorflow/models/blob/master/research/object_detection/datas
 
 https://va-vsrv-github.a.internal/Cosmiq/spacenetTensorflow/blob/master/create_geojson_airplane_tf_record_updated.py
 
+
+scp -r /Users/avanetten/Documents/cosmiq/yolt2/scripts/* 10.123.0.100:/raid/local/src/yolt2/scripts/
+scp -r /Users/avanetten/Documents/cosmiq/simrdwn/src 10.123.0.100:/raid/local/src/simrdwn/
+
+
 https://github.com/chiphuyen/stanford-tensorflow-tutorials/blob/master/examples/09_tfrecord_example.py
 
 def get_image_binary(filename):
@@ -54,22 +59,19 @@ import time
 #from object_detection.utils import label_map_util
 
 """Utility functions for creating TFRecord data sets."""
+# https://github.com/tensorflow/models/blob/master/research/object_detection/utils/dataset_util.py
 
 def int64_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
-
 def int64_list_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
-
 
 def bytes_feature(value):
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-
 def bytes_list_feature(value):
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
-
 
 def float_list_feature(value):
   return tf.train.Feature(float_list=tf.train.FloatList(value=value))
@@ -92,7 +94,9 @@ def load_pbtxt(pbtxt_filename, verbose=False):
     try:
         f = open(pbtxt_filename, "r")
     except:
-        return {0:0}
+        print (pbtxt_filename, "not found")
+        return
+        #return {0:0}
     label_dict = {}
     prev_line = ''
     for i,line_raw in enumerate(f.readlines()):
@@ -246,7 +250,8 @@ def yolt_to_tf_example(image_file, label_file,
         else:
             cat_int_out = cat_int
         classes.append(int(cat_int_out)) #cd dlabel_map_dict[obj['name']])
-        classes_text.append(label_map_dict[cat_int_out]) #obj['name'].encode('utf8'))
+        classes_text.append(label_map_dict[cat_int_out].encode()) #obj['name'].encode('utf8'))
+        #classes_text.append(label_map_dict[cat_int_out]) #obj['name'].encode('utf8'))
         #truncated.append(0) #int(obj['truncated']))
         #poses.append(0) #obj['pose'].encode('utf8'))
 
@@ -254,6 +259,7 @@ def yolt_to_tf_example(image_file, label_file,
       print("  len objects:", len(xmin))
       print("  classes:", classes)
       print("  classes_text:", classes_text)
+      #print("  type classes_text:", type(classes_text))
 
   example = tf.train.Example(features=tf.train.Features(feature={
       'image/height': int64_feature(height),
@@ -370,7 +376,8 @@ def yolt_imlist_to_tf(image_list_file, label_map_dict, TF_RecordPath,
         print("\nIngesting", image_list_file, "...\n")
         
     # shuffle    
-    floc = open(image_list_file, 'rb')
+    floc = open(image_list_file, 'r')
+    #floc = open(image_list_file, 'rb')
     lines = floc.readlines()
     random.shuffle(lines)
     # take first few records as validation files
@@ -417,7 +424,8 @@ def testlist_to_tf(image_list_file,  TF_RecordPath, verbose=False):
         
     # shuffle  
     t0 = time.time()
-    floc = open(image_list_file, 'rb')
+    floc = open(image_list_file, 'r')
+    #floc = open(image_list_file, 'rb')
     lines = floc.readlines()
     #random.shuffle(lines)
     
@@ -497,9 +505,10 @@ def main():
                     3:  2,  # boat     
                     5:  3,  #' car'
                    }
-    elif args.pbtxt_filename.endswith('class_labels_airport.pbtxt'):
-        convert_dict = {0:  1,  # airport
-                   }
+    #elif args.pbtxt_filename.endswith('class_labels_airport.pbtxt'):
+    #    convert_dict = {0:  1,  # airport
+    #               }
+    
     # usually we just want to increase the number by one
     else:
         convert_dict = {x:x+1 for x in range(100)}
@@ -515,29 +524,6 @@ def main():
         #                9:  10
         #           }
         
-
-    #label_map_dict = {0:    'airplane',
-    #                  1:    'airport',
-    #                  2:    'boat',
-    #                  3:    'boat_harbor',
-    #                  4:    'car'}
-    
-    ##out_dir =   '/Users/avanetten/Documents/cosmiq/simrdwn/'    
-    ## make temporary image list to test out yolt_imlist_to_tf()
-    #image_dir = '/Users/avanetten/Documents/cosmiq/qgis_labels/parse_shapefile/outputs/WV03_03102015_R1C2/images'
-    #image_list_file = os.path.join(outdir, 'test_list.txt')
-    #file_out = open(image_list_file, "w")
-    #im_list = os.listdir(image_dir)
-    #for im in im_list:
-    #    path_tot = os.path.join(image_dir, im)
-    #    #line_out = path_tot.replace('|', '\|') + '\n'
-    #    line_out = path_tot + '\n'
-    #    file_out.write(line_out)
-    #    #print("line_out:", line_out)
-    #file_out.close()
-    
-        
-    #yolt_dir_to_tf(image_dir, label_map_dict, TF_RecordPath, verbose=verbose)
     yolt_imlist_to_tf(args.image_list_file, label_map_dict, args.outfile,
                       TF_PathVal=args.outfile_val, val_frac=args.val_frac, 
                       convert_dict=convert_dict, verbose=verbose)  

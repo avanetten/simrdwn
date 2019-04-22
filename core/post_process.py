@@ -3,7 +3,7 @@
 """
 Created on Tue Jan 16 15:05:43 2018
 
-@author: avanetten
+@author: ave
 """
 
 from __future__ import print_function
@@ -12,8 +12,9 @@ from osgeo import ogr
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-#import matplotlib
-#import random
+import matplotlib
+import skimage.io
+import random
 import pickle
 import math
 import time
@@ -24,14 +25,14 @@ import os
 
 path_simrdwn_core = os.path.dirname(os.path.realpath(__file__))
 # import slice_im, convert, post_process scripts
-sys.path.append(path_simrdwn_core)
-
+#sys.path.append(path_simrdwn_core)
+#import add_geo_cooords
 
 ###############################################################################
 def get_global_coords(row, 
-                      edge_buffer_valid=0,
+                      edge_buffer_test=0,
                       max_edge_aspect_ratio=4,
-                      valid_box_rescale_frac=1.0,
+                      test_box_rescale_frac=1.0,
                       rotate_boxes=False,
                       ):
     '''Get global coords of bounding box prediction from dataframe row
@@ -49,21 +50,21 @@ def get_global_coords(row,
     vis_w, vis_h = row['Im_Width'], row['Im_Height']
     pad = row['Pad']
     
-    # skip if near edge (set edge_buffer_valid < 0 to skip)
-    if edge_buffer_valid > 0:
-        if ((float(xmin0) < edge_buffer_valid) or 
-            (float(xmax0) > (sliceWidth - edge_buffer_valid)) or                      
-            (float(ymin0) < edge_buffer_valid) or 
-            (float(ymax0) > (sliceHeight - edge_buffer_valid)) ):
+    # skip if near edge (set edge_buffer_test < 0 to skip)
+    if edge_buffer_test > 0:
+        if ((float(xmin0) < edge_buffer_test) or 
+            (float(xmax0) > (sliceWidth - edge_buffer_test)) or                      
+            (float(ymin0) < edge_buffer_test) or 
+            (float(ymax0) > (sliceHeight - edge_buffer_test)) ):
             #print ("Too close to edge, skipping", row, "...")
             return [], []
 
-    # skip if near edge and high aspect ratio (set edge_buffer_valid < 0 to skip)
-    if edge_buffer_valid > 0:
-        if ((float(xmin0) < edge_buffer_valid) or 
-                (float(xmax0) > (sliceWidth - edge_buffer_valid)) or                      
-                (float(ymin0) < edge_buffer_valid) or 
-                (float(ymax0) > (sliceHeight - edge_buffer_valid)) ):
+    # skip if near edge and high aspect ratio (set edge_buffer_test < 0 to skip)
+    if edge_buffer_test > 0:
+        if ((float(xmin0) < edge_buffer_test) or 
+                (float(xmax0) > (sliceWidth - edge_buffer_test)) or                      
+                (float(ymin0) < edge_buffer_test) or 
+                (float(ymax0) > (sliceHeight - edge_buffer_test)) ):
             # compute aspect ratio
             dx = xmax0 - xmin0
             dy = ymax0 - ymin0
@@ -81,8 +82,8 @@ def get_global_coords(row,
     
     # rescale output box size if desired, might want to do this
     #    if the training boxes were the wrong size
-    if valid_box_rescale_frac != 1.0:
-        dl = valid_box_rescale_frac
+    if test_box_rescale_frac != 1.0:
+        dl = test_box_rescale_frac
         xmid, ymid = np.mean([xmin, xmax]), np.mean([ymin, ymax])
         dx = dl*(xmax - xmin) / 2
         dy = dl*(ymax - ymin) / 2
@@ -120,12 +121,12 @@ def get_global_coords(row,
       
 ###############################################################################
 def augment_df(df, 
-               valid_testims_dir_tot='',
+               testims_dir_tot='',
                slice_sizes=[416],
-               valid_slice_sep='__',
-               edge_buffer_valid=0,
+               test_slice_sep='__',
+               edge_buffer_test=0,
                max_edge_aspect_ratio=4,
-               valid_box_rescale_frac=1.0,
+               test_box_rescale_frac=1.0,
                rotate_boxes=False,
                verbose=False
                ):
@@ -158,8 +159,8 @@ def augment_df(df,
         ext = f.split('.')[-1]
         # get im_root, (if not slicing ignore '|')
         if slice_sizes[0] > 0:
-            im_root_tmp = f.split(valid_slice_sep)[0]
-            xy_tmp = f.split(valid_slice_sep)[-1]
+            im_root_tmp = f.split(test_slice_sep)[0]
+            xy_tmp = f.split(test_slice_sep)[-1]
         else:
             im_root_tmp, xy_tmp = f, '0_0_0_0_0_0_0'
         if im_root_tmp == xy_tmp:
@@ -192,7 +193,7 @@ def augment_df(df,
     im_roots_update = []
     for ftmp in df['Image_Root'].values:
         # get image path
-        im_path = os.path.join(valid_testims_dir_tot, ftmp.strip())
+        im_path = os.path.join(testims_dir_tot, ftmp.strip())
         if os.path.exists(im_path):
             im_roots_update.append(os.path.basename(im_path))
             im_paths_list.append(im_path)
@@ -207,13 +208,13 @@ def augment_df(df,
                     found = True
                     break
             if not found:
-                print ("im_path not found with valid extensions:", im_path)
+                print ("im_path not found with test extensions:", im_path)
                 print ("   im_path_tmp:", im_path_tmp)
     # update columns
     df['Image_Path'] = im_paths_list
     df['Image_Root'] = im_roots_update
 
-    #df['Image_Path'] = [os.path.join(valid_testims_dir_tot, f.strip()) for f
+    #df['Image_Path'] = [os.path.join(testims_dir_tot, f.strip()) for f
     #                    in df['Image_Root'].values]
 
     print ("  add in global location of each row")
@@ -224,9 +225,9 @@ def augment_df(df,
         for index, row in df.iterrows():
             #bounds, coords = get_global_coords(args, row)
             bounds, coords = get_global_coords(row, 
-                                               edge_buffer_valid=edge_buffer_valid,
+                                               edge_buffer_test=edge_buffer_test,
                                                max_edge_aspect_ratio=max_edge_aspect_ratio,
-                                               valid_box_rescale_frac=valid_box_rescale_frac,
+                                               test_box_rescale_frac=test_box_rescale_frac,
                                                rotate_boxes=rotate_boxes)
             if len(bounds) == 0 and len(coords) == 0:
                 bad_idxs.append(index)
@@ -252,7 +253,7 @@ def augment_df(df,
     
     # remove bad_idxs
     if len(bad_idxs) > 0:
-        print ("removing bad idxs:", bad_idxs)
+        print ("removing bad idxs near junctions:", bad_idxs)
         df = df.drop(df.index[bad_idxs])  
             
     print ("Time to augment dataframe of length:", len(df), "=",
@@ -261,13 +262,13 @@ def augment_df(df,
     
 
 ###############################################################################
-def post_process_yolt_valid_create_df(yolt_valid_classes_files, log_file, 
-               valid_testims_dir_tot='',
+def post_process_yolt_test_create_df(yolt_test_classes_files, log_file, 
+               testims_dir_tot='',
                slice_sizes=[416],
-               valid_slice_sep='__',
-               edge_buffer_valid=0,
+               test_slice_sep='__',
+               edge_buffer_test=0,
                max_edge_aspect_ratio=4,
-               valid_box_rescale_frac=1.0,
+               test_box_rescale_frac=1.0,
                rotate_boxes=False):
     '''take output files and create df
     # df.columns:
@@ -277,19 +278,19 @@ def post_process_yolt_valid_create_df(yolt_valid_classes_files, log_file,
         # dtype='object')
         
     # test
-    #args.yolt_valid_classes_files = ['/cosmiq/yolt2/results/valid_yolt2_explore1_cfg=ave_19x19_2017_04_25_22-47-05/building.txt']
+    #args.yolt_test_classes_files = ['/Users/avanetten/Documents/cosmiq/yolt2/results/test_yolt2_explore1_cfg=ave_19x19_2017_04_25_22-47-05/building.txt']
     '''
  
     # parse out files, create df
     df_tot = []
     
-    #str0 = '"args.yolt_valid_classes_files: ' + str(args.valid_results) + '\n"'
+    #str0 = '"args.yolt_test_classes_files: ' + str(args.test_results) + '\n"'
     
-    for i,vfile in enumerate(yolt_valid_classes_files):
+    for i,vfile in enumerate(yolt_test_classes_files):
 
-        valid_base_string = '"valid_file: ' + str(vfile) + '\n"'
-        print (valid_base_string[1:-2])
-        os.system('echo ' + valid_base_string + ' >> ' + log_file)
+        test_base_string = '"test_file: ' + str(vfile) + '\n"'
+        print (test_base_string[1:-2])
+        os.system('echo ' + test_base_string + ' >> ' + log_file)
         
         cat = vfile.split('/')[-1].split('.')[0]
         # load into dataframe
@@ -301,12 +302,12 @@ def post_process_yolt_valid_create_df(yolt_valid_classes_files, log_file,
         
         # augment
         df = augment_df(df, 
-               valid_testims_dir_tot=valid_testims_dir_tot,
+               testims_dir_tot=testims_dir_tot,
                slice_sizes=slice_sizes,
-               valid_slice_sep=valid_slice_sep,
-               edge_buffer_valid=edge_buffer_valid,
+               test_slice_sep=test_slice_sep,
+               edge_buffer_test=edge_buffer_test,
                max_edge_aspect_ratio=max_edge_aspect_ratio,
-               valid_box_rescale_frac=valid_box_rescale_frac,
+               test_box_rescale_frac=test_box_rescale_frac,
                rotate_boxes=rotate_boxes)
         
 #        # extract image root
@@ -319,8 +320,8 @@ def post_process_yolt_valid_create_df(yolt_valid_classes_files, log_file,
 #            ext = f.split('.')[-1]
 #            # get im_root, (if not slicing ignore '|')
 #            if args.slice_sizes[0] > 0:
-#                im_root_tmp = f.split(args.valid_slice_sep)[0]
-#                xy_tmp = f.split(args.valid_slice_sep)[-1]
+#                im_root_tmp = f.split(args.test_slice_sep)[0]
+#                xy_tmp = f.split(args.test_slice_sep)[-1]
 #            else:
 #                im_root_tmp, xy_tmp = f, '0_0_0_0_0_0_0'
 #
@@ -345,7 +346,7 @@ def post_process_yolt_valid_create_df(yolt_valid_classes_files, log_file,
 #        df['Im_Height'] = [float(sl.split('_')[6].split('.')[0]) for sl in df['Slice_XY'].values]
 #        
 #        # set image path
-#        df['Image_Path'] = [os.path.join(args.valid_testims_dir_tot, f) for f
+#        df['Image_Path'] = [os.path.join(args.testims_dir_tot, f) for f
 #                            in df['Image_Root'].values]
 #
 #        # add in global location of each row
@@ -406,13 +407,13 @@ def post_proccess_make_plots(args, df, verbose=False):
             
         print ("\n", itmp, "/", len(group), "Analyzing Image:", im_path)
 
-        # plot validation outputs    
+        # plot testation outputs    
         #for plot_thresh_tmp in plot_thresh:
         for plot_thresh_tmp in thresh_poly_dic.keys():
-            if args.valid_make_pngs.upper() != 'FALSE':
+            if args.test_make_pngs.upper() != 'FALSE':
                 figname_val = os.path.join(args.results_dir, im_root_noext \
-                            + '_valid_thresh=' + str(plot_thresh_tmp) + '.png')
-                            #+ '_valid_thresh=' + str(plot_thresh_tmp) + '.jpeg')
+                            + '_test_thresh=' + str(plot_thresh_tmp) + '.png')
+                            #+ '_test_thresh=' + str(plot_thresh_tmp) + '.jpeg')
 
             else:
                 figname_val = ''
@@ -475,10 +476,10 @@ def post_proccess_make_plots(args, df, verbose=False):
 def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_thresh,
               verbose=False):
     '''
-    Iterate through files and plot on valid_im
+    Iterate through files and plot on test_im
     see modular_sliding_window.py
     each line of input data is: [file, xmin, ymin, xmax, ymax]
-    /cosmiq/yolt2/test_images/scs_0.2_split/slice_scs_0.2_0_1024.jpg 0.003840 0.553413 1.505103 1.309415 2.035146
+    /Users/avanetten/Documents/cosmiq/yolt2/test_images/scs_0.2_split/slice_scs_0.2_0_1024.jpg 0.003840 0.553413 1.505103 1.309415 2.035146
     outlist has format: [xmin, ymin, xmax, ymax, filename, file_v, prob, 
                          color0, color1, color2, labeltmp, labeltmp_full] = b
     '''
@@ -574,12 +575,12 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
             prob = float(prob0)
             if prob >= plot_thresh:
                                     
-                # skip if near edge (set edge_buffer_valid < 0 to skip)
-                if args.edge_buffer_valid > 0:
-                    if ((float(xmin0) < args.edge_buffer_valid) or 
-                        (float(xmax0) > (sliceWidth - args.edge_buffer_valid)) or                      
-                        (float(ymin0) < args.edge_buffer_valid) or 
-                        (float(ymax0) > (sliceHeight - args.edge_buffer_valid)) ):
+                # skip if near edge (set edge_buffer_test < 0 to skip)
+                if args.edge_buffer_test > 0:
+                    if ((float(xmin0) < args.edge_buffer_test) or 
+                        (float(xmax0) > (sliceWidth - args.edge_buffer_test)) or                      
+                        (float(ymin0) < args.edge_buffer_test) or 
+                        (float(ymax0) > (sliceHeight - args.edge_buffer_test)) ):
                         print ("Too close to edge, skipping", row, "...")
                         continue
                 
@@ -593,8 +594,8 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
 #                
 #                # rescale output box size if desired, might want to do this
 #                #    if the training boxes were the wrong size
-#                if args.valid_box_rescale_frac != 1.0:
-#                    dl = args.valid_box_rescale_frac
+#                if args.test_box_rescale_frac != 1.0:
+#                    dl = args.test_box_rescale_frac
 #                    xmid, ymid = np.mean([xmin, xmax]), np.mean([ymin, ymax])
 #                    dx = dl*(xmax - xmin) / 2
 #                    dy = dl*(ymax - ymin) / 2
@@ -629,7 +630,8 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
                                 cv2.putText(img_mpl, label, (int(xmin)
                                     +text_offset[0], int(ymin)+text_offset[1]), 
                                     font, font_size, color, font_width, 
-                                    cv2.CV_AA)#, cv2.LINE_AA)
+                                    #cv2.CV_AA)
+                                    cv2.LINE_AA)
                             except:
                                 cv2.putText(img_mpl, label, (int(xmin)
                                     +text_offset[0], int(ymin)+text_offset[1]), 
@@ -667,7 +669,8 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
                                                     int(ymin)+text_offset[1]), 
                                                     font, font_size, color, 
                                                     font_width, 
-                                                    cv2.CV_AA)#, cv2.LINE_AA)
+                                                    #cv2.CV_AA)
+                                                    cv2.LINE_AA)
 
             else:
                 # plot rotated rect
@@ -694,12 +697,13 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
                                                 int(ymin)+text_offset[1]), 
                                                 font, font_size, color_ex, 
                                                 font_width,  
-                                                cv2.CV_AA)#cv2.LINE_AA)
+                                                #cv2.CV_AA)
+                                                cv2.LINE_AA)
 
                 legend_dic[extra_idx] = (labeltmp, color_ex)
 
     # add legend and border, if desired
-    if args.valid_make_legend_and_title.upper() == 'TRUE':
+    if args.test_make_legend_and_title.upper() == 'TRUE':
 
         # add border
         # http://docs.opencv.org/3.1.0/d3/df2/tutorial_py_basic_ops.html
@@ -717,7 +721,8 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
             ypos = border[0] + (2+itmp) * ydiff
             cv2.putText(img_mpl, text, (int(xpos), int(ypos)), font, 
                         1.5*font_size, colort, label_font_width, 
-                        cv2.CV_AA)#cv2.LINE_AA)
+                        #cv2.CV_AA)
+                        cv2.LINE_AA)
     
         # legend box
         cv2.rectangle(img_mpl, (xpos-5, 2*border[0]), (img_mpl.shape[1]-10, 
@@ -729,7 +734,8 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
                         + str(plot_thresh) # + ': thresh=' + str(plot_thresh)
         cv2.putText(img_mpl, title, title_pos, font, 1.7*font_size, (0,0,0), 
                     label_font_width,  
-                    cv2.CV_AA)#cv2.LINE_AA)
+                    #cv2.CV_AA)
+                    cv2.LINE_AA)
 
     print ("Saving to files", outpkl, figname, "...")
  
@@ -742,9 +748,9 @@ def plot_vals_deprecated(args, im_path, data_all_classes, outpkl, figname, plot_
         img_mpl_out = img_mpl #= cv2.cvtColor(img_mpl, cv2.COLOR_BGR2RGB)
         #cv2.imwrite(figname, img_mpl_out)
         # compress?
-        cv2.imwrite(figname, img_mpl_out,  [cv2.IMWRITE_PNG_COMPRESSION, args.valid_im_compression_level])
+        cv2.imwrite(figname, img_mpl_out,  [cv2.IMWRITE_PNG_COMPRESSION, args.test_im_compression_level])
 
-        if args.show_valid_plots:
+        if args.show_test_plots:
             #plt.show()
             cmd = 'eog ' + figname + '&'
             os.system(cmd)
@@ -762,6 +768,10 @@ def non_max_suppression(boxes, overlapThresh):
     see modular_sliding_window.py, functions non_max_suppression, \
             non_max_supression_rot
     '''
+    
+    print ("Executing non-max suppression...")
+    
+    len_init = len(boxes)
     
     # if there are no boxes, return an empty list
     if len(boxes) == 0:
@@ -821,7 +831,41 @@ def non_max_suppression(boxes, overlapThresh):
     #outboxes_tot = boxes_tot[pick]
     outboxes_tot = [boxes_tot[itmp] for itmp in pick]
     
+    print ("  non-max suppression init boxes:", len_init)
+    print ("  non-max suppression final boxes:", len(outboxes_tot))
+    
     return outboxes, outboxes_tot, pick
+
+###############################################################################
+def building_polys_to_csv(image_name, building_name, coords, conf=0, 
+                          asint=True, rotate_boxe=True, use2D=False):
+    '''
+    for spacenet data
+    coords should have format [[x0, y0], [x1, y1], ... ]
+    Outfile should have format: 
+            ImageId,BuildingId,PolygonWKT_Pix,Confidence
+            https://gis.stackexchange.com/questions/109327/convert-list-of-coordinates-to-ogrgeometry-or-wkt
+            https://pcjericks.github.io/py-gdalogr-cookbook/geometry.html
+    '''
+                
+    if asint:
+        coords = np.array(coords).astype(int)
+            
+    ring = ogr.Geometry(ogr.wkbLinearRing)
+    for coord in coords:
+        ring.AddPoint(coord[0], coord[1])
+    # add first point to close polygon
+    ring.AddPoint(coords[0][0], coords[0][1])
+    
+    poly = ogr.Geometry(ogr.wkbPolygon)
+    poly.AddGeometry(ring)
+    if use2D:
+        # This doesn't work for some reason!!!!
+        poly.flattenTo2D()
+    wktpoly = poly.ExportToWkt()
+    
+    row = [image_name, building_name, wktpoly, conf]
+    return row
 
 
 ###############################################################################
@@ -959,7 +1003,7 @@ def refine_df(df, groupby='Loc_Tmp',
     df_out = df.loc[df_idxs_tot_final]
     
     t1 = time.time()
-    print ("Inintial length:", len(df), "Final length:", len(df_out))
+    print ("Initial length:", len(df), "Final length:", len(df_out))
     print ("Time to run refine_df():", t1-t0, "seconds")
     return df_out  #refine_dic
             
@@ -974,13 +1018,19 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
                  building_csv_file='',
                  shuffle_ims=False, verbose=True):
            
-    '''Plot refined dataframe}'''
+    '''Plot refined dataframe
+    If outputing to spacenet csv, the format of an imageId is: 
+        Atlanta_nadir{nadir-angle}_catid_{catid}_{x}_{y}'''
 
     print ("Running plot_refined_df...")
     t0 = time.time()
     # get colormap, if plotting
     outfile_legend = os.path.join(outdir, legend_root)
     colormap, color_dict = make_color_legend(outfile_legend, label_map_dict)
+    print ("color_dict:", color_dict)
+    # list for spacenet buildings
+    #building_list = []  # no header?
+    building_list = [["ImageId", "BuildingId", "PolygonWKT_Pix", "Confidence"]]
     
     # group by image, and plot
     if shuffle_ims:
@@ -995,12 +1045,27 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
             break
         
         img_loc_string = g[0]
+        print ("img_loc:", img_loc_string)
         
         #if '740351_3737289' not in img_loc_string:
         #    continue
         
         data_all_classes = g[1] 
-        image = cv2.imread(img_loc_string, 1)
+        #image = cv2.imread(img_loc_string, 1)
+        # we want image as bgr (cv2 format)
+        try:
+            image = cv2.imread(img_loc_string, 1)
+            #tst = image.shape
+            print ("  cv2: image.shape:", image.shape)
+        except:
+            img_sk = skimage.io.imread(img_loc_string)
+            # make sure image is h,w,channels (assume less than 20 channels)
+            if (len(img_sk.shape) == 3) and (img_sk.shape[0] < 20): 
+                img_mpl = np.moveaxis(img_sk, 0, -1)
+            else:
+                img_mpl = img_sk
+            image = cv2.cvtColor(img_mpl, cv2.COLOR_RGB2BGR)   
+            print ("  skimage: image.shape:", image.shape)
         
         #image_root = data_all_classes['Image_Root'].values[0]
         im_root = os.path.basename(img_loc_string)
@@ -1013,7 +1078,6 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
             print ("  num boxes:", len(data_all_classes))
         #if verbose:
             print ("  image.shape:", image.shape)
-        
 
         xmins = data_all_classes['Xmin_Glob'].values
         ymins = data_all_classes['Ymin_Glob'].values
@@ -1035,6 +1099,35 @@ def plot_refined_df(df, groupby='Loc_Tmp', label_map_dict={},
                   plot_line_thickness=plot_line_thickness,
                   verbose=verbose)
         
+        # make building arrays if desired
+        if len(building_csv_file) > 0:
+            # The format of an imageId is Atlanta_nadir{nadir-angle}_catid_{catid}_{x}_{y}
+            im_name0 = img_loc_string.split('/')[-1].split('.')[0]
+            im_name1 = 'Atlanta_nadir' + im_name0.split('nadir')[-1]
+            for j,(xmin, ymin, xmax, ymax, prob) in enumerate(zip(xmins, ymins, xmaxs, ymaxs, scores)):
+                
+                # set coords
+                coords = [[xmin, ymin], [xmax, ymin], [xmax, ymax], 
+                          [xmin, ymax]]
+        
+                wkt_row = building_polys_to_csv(im_name1, str(j), 
+                                                    coords,
+                                                    conf=prob)                      
+                building_list.append(wkt_row)
+                #thresh_poly_dic[plot_thresh_tmp].append(wkt_row)
+            
+
+    # save array for spacenet scoring
+    if len(building_csv_file) > 0:
+        csv_name = building_csv_file  #os.path.join(args.results_dir, 'predictions_' \
+                                        #+ str(plot_thresh_tmp) + '.csv')
+        print ("Saving wkt buildings to file:", csv_name, "...")
+        # save to csv
+        with open(csv_name, 'wb') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',')
+            for j,line in enumerate(building_list):
+                print (j, line)
+                writer.writerow(line)            
 
 
     t1 = time.time()
@@ -1170,7 +1263,7 @@ def refine_and_plot_df(df, groupby='Loc_Tmp', label_map_dict={},
                 out_list.append([img_loc_string, score, x0, y0, x1, y1, class_str, image_root])
             
             classes_str = np.array(len(scores) * [class_str])
-            #image_roots = np.array(len(scores) * [image_root])
+            image_roots = np.array(len(scores) * [image_root])
             
             # add to image values
             classes_im.extend(classes_str)
@@ -1186,7 +1279,21 @@ def refine_and_plot_df(df, groupby='Loc_Tmp', label_map_dict={},
             outfile_legend = os.path.join(outdir, legend_root)
             colormap, color_dict = make_color_legend(outfile_legend, label_map_dict)
 
-            image = cv2.imread(img_loc_string, 1)
+            #image = cv2.imread(img_loc_string, 1)
+            # we want image as bgr (cv2 format)
+            try:
+                image = cv2.imread(img_loc_string, 1)
+                tst = image.shape
+            except:
+                img_sk = skimage.io.imread(img_loc_string)
+                # make sure image is h,w,channels (assume less than 20 channels)
+                if (len(img_sk.shape) == 3) and (img_sk.shape[0] < 20): 
+                    img_mpl = np.moveaxis(img_sk, 0, -1)
+                else:
+                    img_mpl = img_sk
+                image = cv2.cvtColor(img_mpl, cv2.COLOR_RGB2BGR)   
+
+
             if verbose:
                 print ("  image.shape:", image.shape)
             
@@ -1397,7 +1504,7 @@ def refine_and_plot_df_v0(df, groupby='Loc_Tmp', label_map_dict={},
     return refine_dic
 
 ###############################################################################
-def make_color_legend(outfile, label_map_dict, auto_assign_colors=True,
+def make_color_legend(outfile, label_map_dict, auto_assign_colors=False,
                       verbose=False):
     '''Create and save color legend as image'''
         
@@ -1467,8 +1574,8 @@ def make_color_legend(outfile, label_map_dict, auto_assign_colors=True,
     try:
         cv2.putText(img_mpl, 'Color Legend', (int(xpos), int(ydiff)), font, 
                     1.5*font_size, (0,0,0), int(1.5*label_font_width), 
-                    cv2.CV_AA)
-                    #cv2.LINE_AA)
+                    #cv2.CV_AA)
+                    cv2.LINE_AA)
     except:
         cv2.putText(img_mpl, 'Color Legend', (int(xpos), int(ydiff)), font, 
                     1.5*font_size, (0,0,0), int(1.5*label_font_width), 
@@ -1509,7 +1616,7 @@ def make_color_legend(outfile, label_map_dict, auto_assign_colors=True,
 def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
               color_dict={},  #colormap=[(0,0,0)], 
               plot_line_thickness=2, show_labels=True, 
-              label_alpha_scale=0.85, compression_level=7,
+              label_alpha_scale=0.85, compression_level=9,
               alpha_scaling=True, show_plots=False, skip_empty=False,
               resize_factor=1,
               verbose=False, super_verbose=False):
@@ -1545,13 +1652,22 @@ def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
         if verbose:
             print ("Binning scores in plot_rects()...")
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.digitize.html
-        bins = np.linspace(0, 1, 11)   # define a step of 0.1 between 0 and 1
-        inds = np.digitize(scores, bins)   # bin that each element belongs to
+        bins = np.linspace(0.2, 0.95, 7)   # define a step between 0.25 and 0.95
+        #bins = np.linspace(0, 1.0, 11)   # define a step of 0.1 between 0 and 1?
+        # clip scores to highest value of bins
+        scores_clip = np.clip(scores, 0, np.max(bins))
+        inds = np.digitize(scores_clip, bins, right=True)   # bin that each element belongs to
         unique_inds = np.sort(np.unique(inds))
         for bin_ind in unique_inds:
+            
+            # overlay for boxes and labels, respectively
+            overlay = np.zeros(im.shape).astype(np.uint8)     #overlay = im_raw.copy()
+            overlay1 = np.zeros(im.shape).astype(np.uint8)
+
             alpha_val = bins[bin_ind]
+
             boxes_bin = boxes[bin_ind == inds]
-            scores_bin = scores[bin_ind == inds]
+            scores_bin = scores_clip[bin_ind == inds]
             classes_bin = classes[bin_ind == inds]
 
             if verbose:
@@ -1559,16 +1675,18 @@ def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
                 print ("alpha_val:", alpha_val)
                 print ("scores_bin.shape:", scores_bin.shape)
             
-            # define overlay alpha
-            # rescale to be between 0.3 and 1 (alpha_val starts at 0.1)
-            alpha = 0.2 + 0.8*alpha_val
-            #alpha = min(0.95, alpha_val+0.1)
-            overlay = np.zeros(im.shape).astype(np.uint8)     #overlay = im_raw.copy()
+            alpha = alpha_val
+#            # rescale? overlay alpha
+#            # if we bin from 0 to 1, rescale
+#            ## rescale to be between 0.25 and 0.95 (alpha_val starts at 0.0)
+#            alpha = 0.25 + 0.7*alpha_val            
+#            ## rescale to be between 0.3 and 1 (alpha_val starts at 0.1)
+#            #alpha = 0.2 + 0.8*alpha_val
+#            #alpha = min(0.95, alpha_val+0.1)
 
             # for labels, if desired, make labels a bit dimmer 
-            alpha_prime = max(0.25, label_alpha_scale * alpha)
-            overlay1 = np.zeros(im.shape).astype(np.uint8)
-
+            alpha_prime = max(min(bins), label_alpha_scale * alpha)
+            # add boxes
             for box, score, classy in zip(boxes_bin, scores_bin, classes_bin):
               
                 if score >= plot_thresh:
@@ -1589,7 +1707,6 @@ def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
                         print ("  left, right, top, bottom:", left, right, top, bottom)
                         return
                     
-                   
                     # get label and color
                     classy_str = str(classy) + ': ' + str(int(100*float(score))) + '%'
                     color = color_dict[classy]
@@ -1646,8 +1763,8 @@ def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
                                                 color, -1)
                         cv2.putText(overlay1, display_str, text_loc, 
                                         font, font_size, (0,0,0), font_width, 
-                                        cv2.CV_AA)
-                                        #cv2.LINE_AA)
+                                        #cv2.CV_AA)
+                                        cv2.LINE_AA)
  
     
             # for the bin, combine overlay and original image              
@@ -1745,8 +1862,8 @@ def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
                                             color, -1)
                     cv2.putText(output, display_str, text_loc, 
                                         font, font_size, (0,0,0), font_width, 
-                                        cv2.CV_AA)
-                                        #cv2.LINE_AA)
+                                        #cv2.CV_AA)
+                                        cv2.LINE_AA)
     
     # resize, if desired
     if resize_factor != 1:
@@ -1773,7 +1890,7 @@ def plot_rects(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
 def plot_rects_v0(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
               color_dict={},  #colormap=[(0,0,0)], 
               plot_line_thickness=2, show_labels=True, 
-              label_alpha_scale=0.85, compression_level=7,
+              label_alpha_scale=0.85, compression_level=9,
               alpha_scaling=True, show_plots=False, skip_empty=False,
               verbose=False):
     '''Plot boxes in image
@@ -1966,8 +2083,8 @@ def plot_rects_v0(im, boxes, scores, classes=[], outfile='', plot_thresh=0.3,
                                             color, -1)
                     cv2.putText(output, display_str, text_loc, 
                                         font, font_size, (0,0,0), font_width, 
-                                        cv2.CV_AA)
-                                        #cv2.LINE_AA)
+                                        #cv2.CV_AA)
+                                        cv2.LINE_AA)
 
                     #cv2.rectangle(output, (int(left-margin), int(text_bottom - text_height - 3 * margin)), 
                     #                        (int(left + text_width), int(text_bottom)), color, -1)

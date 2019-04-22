@@ -9,7 +9,7 @@ Lightly adapted from:
     https://github.com/tensorflow/models/blob/master/research/object_detection/inference/infer_detections.py
     and 
     https://github.com/tensorflow/models/blob/master/research/object_detection/inference/detection_inference.py
-    Also see:
+    and
     https://github.com/tensorflow/models/blob/master/research/object_detection/object_detection_tutorial.ipynb
 
 """
@@ -54,7 +54,8 @@ metrics).
 #from object_detection.inference import detection_inference
 import os
 import sys
-sys.path.append('/opt/tensorflow-models/research/object_detection/inference')
+sys.path.append('/tensorflow/models/research/object_detection/inference')
+#sys.path.append('/opt/tensorflow-models/research/object_detection/inference')
 import detection_inference
 ######################
 

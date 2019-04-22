@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Wed Jun 22 02:53:01 2016
@@ -10,6 +9,8 @@ from __future__ import print_function
 import os
 import cv2
 import time
+import numpy as np
+import skimage.io
 
 ###############################################################################    
 def slice_im(image_path, out_name, outdir, sliceHeight=256, sliceWidth=256, 
@@ -20,7 +21,20 @@ def slice_im(image_path, out_name, outdir, sliceHeight=256, sliceWidth=256,
     Assume three bands.
     if out_ext == '', use input file extension for saving'''
 
-    image0 = cv2.imread(image_path, 1)  # color
+    use_cv2 = True
+    # read in image, cv2 fails on large files
+    print ("Read in image:", image_path)
+    try:
+        #convert to rgb (cv2 reads in bgr)
+        img_cv2 = cv2.imread(image_path, 1)
+        #print ("img_cv2.shape:", img_cv2.shape)
+        image0 = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
+    except:
+        image0 = skimage.io.imread(image_path, as_grey=False).astype(np.uint8)#[::-1]
+        use_cv2 = False
+    print ("image.shape:", image0.shape)
+    #image0 = cv2.imread(image_path, 1)  # color
+    
     if len(out_ext) == 0:
         ext = '.' + image_path.split('.')[-1]
     else:
@@ -48,11 +62,13 @@ def slice_im(image_path, out_name, outdir, sliceHeight=256, sliceWidth=256,
     dx = int((1. - overlap) * sliceWidth)
     dy = int((1. - overlap) * sliceHeight)
 
-    for y0 in xrange(0, image0.shape[0], dy):#sliceHeight):
-        for x0 in xrange(0, image0.shape[1], dx):#sliceWidth):
+    #for y0 in xrange(0, image0.shape[0], dy):#sliceHeight):
+    #    for x0 in xrange(0, image0.shape[1], dx):#sliceWidth):
+    for y0 in range(0, image0.shape[0], dy):#sliceHeight):
+        for x0 in range(0, image0.shape[1], dx):#sliceWidth):
             n_ims += 1
             
-            if (n_ims % 100) == 0:
+            if (n_ims % 50) == 0:
                 print (n_ims)
             
             # make sure we don't have a tiny image on the edge
@@ -68,8 +84,11 @@ def slice_im(image_path, out_name, outdir, sliceHeight=256, sliceWidth=256,
             # extract image
             window_c = image0[y:y + sliceHeight, x:x + sliceWidth]
             # get black and white image
-            window = cv2.cvtColor(window_c, cv2.COLOR_BGR2GRAY)
-            
+            if use_cv2:
+                window = cv2.cvtColor(window_c, cv2.COLOR_BGR2GRAY)
+            else:
+                window = cv2.cvtColor(window_c, cv2.COLOR_RGB2GRAY)
+                
             # find threshold that's not black
             # https://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_imgproc/py_thresholding/py_thresholding.html?highlight=threshold
             ret,thresh1 = cv2.threshold(window, 2, 255, cv2.THRESH_BINARY)
@@ -96,7 +115,11 @@ def slice_im(image_path, out_name, outdir, sliceHeight=256, sliceWidth=256,
                 #'_' + str(pad) + '.jpg')
                 if verbose:
                     print ("outpath:", outpath)
-                cv2.imwrite(outpath, window_c)
+                # if large image, convert to bgr prior to saving
+                if not use_cv2:
+                    skimage.io.imsave(outpath, window_c)
+                else:
+                    cv2.imwrite(outpath, window_c)
                 n_ims_nonull += 1
 
     print ("Num slices:", n_ims, "Num non-null slices:", n_ims_nonull, \

@@ -1,6 +1,14 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
+Created on Tue Mar 27 17:59:04 2018
+
+@author: avanetten
+"""
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
 Created on Sun Aug 13 09:42:00 2017
 
 @author: avanetten
@@ -114,6 +122,9 @@ def main():
     args = parser.parse_args()
 
     verbose = bool(args.verbose)
+    
+    prefix = "INFO:tensorflow:loss = "
+    
     # set directories
     #res_dir = os.path.join(args.path, args.res_dir)
     if args.res_dir == 'oops':
@@ -149,11 +160,16 @@ def main():
     out_list = []
     ftmp = open(log_path, "r")
     for line in ftmp:
-        if line.startswith("INFO:tensorflow:global step"):
-            spl0 = line.split("INFO:tensorflow:global step ")[-1]
-            step = spl0.split(":")[0]
-            spl1 = spl0.split("loss = ")
-            loss = spl1[-1].split(" ")[0]
+        if line.startswith(prefix):
+            spl0 = line.split(prefix)[-1]
+            loss = spl0.split(",")[0]
+            spl1 = spl0.split("step = ")
+            step = spl1[-1].split(" ")[0]
+        #if line.startswith("INFO:tensorflow:global step"):
+        #    spl0 = line.split(prefix)[-1]
+        #    step = spl0.split(":")[0]
+        #    spl1 = spl0.split("loss = ")
+        #    loss = spl1[-1].split(" ")[0]
             if verbose:
                 print ("line:", line)
                 print ("  spl0:", spl0)

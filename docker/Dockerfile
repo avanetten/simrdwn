@@ -1,111 +1,158 @@
-FROM nvidia/cuda:8.0-cudnn6-devel
-MAINTAINER Adam Van Etten
+# inspired by sn4_baseline
+FROM nvidia/cuda:9.0-devel-ubuntu16.04
+MAINTAINER avanetten
 
-##############################################
-# Build
-# cd /raid/simrdwn/docker
-# nvidia-docker build --no-cache -t simrdwn .
-# NV_GPU=0 nvidia-docker run -it -v /raid:/raid --name simrdwn_gpu0 simrdwn
-##############################################
+# IF YOU WANT TF PROGRESS PRINTED TO TERMINAL
+# Update model_main to log to screen...
+# https://stackoverflow.com/questions/52016255/tensorflow-object-detection-api-not-displaying-global-steps
+# #. Add tf.logging.set_verbosity(tf.logging.INFO) after the import section of the model_main.py script. It will display a summary after every 100th step. (Can change frequency by log_step_count)
+# vi /tensorflow/models/research/object_detection/model_main.py
+# insert in on line 27:
+#  tf.logging.set_verbosity(tf.logging.INFO)
+# change line 63 to: 
+#  config = tf.estimator.RunConfig(model_dir=FLAGS.model_dir, log_step_count_steps=10)
 
-##############################################
-# Errors encountered in the past
-# https://github.com/tensorflow/tensorflow/issues/16268
-# error in export graph, edit 
-# vi /opt/tensorflow-models/research/object_detection/exporter.py
-#  change line 71 to say:
-#    rewrite_options = rewriter_config_pb2.RewriterConfig()
-##############################################
+# once started run:
+# export PYTHONPATH=$PYTHONPATH:/tensorflow/models/research/:/tensorflow/models/research/slim
 
 
-###################
-# initial packages (some are likely unneccessary)
+ENV CUDNN_VERSION 7.3.0.29
+LABEL com.nvidia.cudnn.version="${CUDNN_VERSION}"
+
+# prep apt-get and cudnn
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    	protobuf-compiler \
-      	build-essential \
-        curl \
-        git \
-		cmake \
-        rsync \
-        software-properties-common \
-        unzip \
-        zip \
-        libcurl3-dev \
-        libfreetype6-dev \
-        libpng12-dev \
-        libzmq3-dev \
-        pkg-config \
-        python-dev \
-        zlib1g-dev \
-        libopencv-dev \
-        python-opencv \
-		python-tk \
-        build-essential autoconf libtool libcunit1-dev \
-        libproj-dev libgdal-dev libgeos-dev libjson0-dev vim python-gdal \
-    	# requirements for keras
-    	python-h5py \
-    	python-yaml \
-    	python-pydot \
-		graphviz \
-        && \
-    apt-get clean && \
+	    apt-utils \
+            libcudnn7=$CUDNN_VERSION-1+cuda9.0 \
+            libcudnn7-dev=$CUDNN_VERSION-1+cuda9.0 && \
+    apt-mark hold libcudnn7 && \
     rm -rf /var/lib/apt/lists/*
 
-###################
-# python packages
-RUN curl -fSsL -O https://bootstrap.pypa.io/get-pip.py && \
-    python get-pip.py && \
-    rm get-pip.py
-RUN pip --no-cache-dir install \
-		protobuf \
-		ipykernel \
-    	jupyter \
-    	matplotlib \
-    	numpy \
-    	scipy \
-    	sklearn \
-		scikit-image \
-		pandas \
-		h5py \
-		shapely \
-    	&& \
-    python -m ipykernel.kernelspec
+# install requirements
+RUN apt-get update \
+  	&& apt-get install -y --no-install-recommends \
+	    bc \
+	    bzip2 \
+	    ca-certificates \
+	    curl \
+	    git \
+	    libgdal-dev \
+	    libssl-dev \
+	    libffi-dev \
+	    libncurses-dev \
+	    libgl1 \
+	    jq \
+	    nfs-common \
+	    parallel \
+	    python-dev \
+	    python-pip \
+	    python-wheel \
+	    python-setuptools \
+	    unzip \
+	    vim \
+		tmux \
+	    wget \
+	    build-essential \
+        libopencv-dev \
+        python-opencv \
+	  && apt-get clean \
+	  && rm -rf /var/lib/apt/lists/*
 
+SHELL ["/bin/bash", "-c"]
+ENV PATH /opt/conda/bin:$PATH
 
-###################
-# Install TensorFlow GPU version.
-#pip install --upgrade https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-0.12.1-cp27-none-linux_x86_64.whl
-#pip install --upgrade https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.4.0-cp27-none-linux_x86_64.whl
-ARG TENSORFLOW_VERSION=1.4.1
-ARG TENSORFLOW_DEVICE=gpu
-ARG TENSORFLOW_APPEND=_gpu
-RUN pip --no-cache-dir install https://storage.googleapis.com/tensorflow/linux/${TENSORFLOW_DEVICE}/tensorflow${TENSORFLOW_APPEND}-${TENSORFLOW_VERSION}-cp27-none-linux_x86_64.whl
+# install anaconda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    /opt/conda/bin/conda clean -tipsy && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc
+ENV TINI_VERSION v0.16.1
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /usr/bin/tini
+RUN chmod +x /usr/bin/tini
 
+# use conda-forge instead of default channel
+RUN conda update conda && \
+    conda config --remove channels defaults && \
+    conda config --add channels conda-forge
 
-###################
-# keras
-ARG KERAS_VERSION=2.0.6
+# set up conda environment and add to $PATH
+RUN conda create -n simrdwn2 python=3.6 \
+                    && echo "source activate simrdwn2" > ~/.bashrc
+ENV PATH /opt/conda/envs/simrdwn2/bin:$PATH
+
+# install GPU version of tensorflow
+RUN source activate simrdwn2 && \
+    conda install -n simrdwn2 -c defaults tensorflow-gpu=1.13.1
+
+# install keras with tf backend
 ENV KERAS_BACKEND=tensorflow
-RUN pip --no-cache-dir install --no-dependencies git+https://github.com/fchollet/keras.git@${KERAS_VERSION}
+RUN source activate simrdwn2 \
+  && conda install -n simrdwn2 keras
 
 
-###################
-# object detection api
-# https://github.com/phipleg/tensorflow-object-detector/blob/master/Dockerfile
-# git clone --branch my_abc http://git.abc.net/git/abc.git
+RUN conda install -n simrdwn2 \
+	              affine \
+	              pyproj \
+	              pyhamcrest=1.9.0 \
+	              cython \
+				  contextlib2 \
+	              fiona \
+	              h5py \
+	              ncurses \
+	              jupyter \
+	              jupyterlab \
+	              ipykernel \
+	              libgdal \
+	              matplotlib \
+				  ncurses \
+	              numpy \
+	              pandas \
+	              pillow \
+	              pip \
+	              scipy \
+	              scikit-image \
+	              scikit-learn \
+	              shapely \
+	              gdal \
+	              rtree \
+	              testpath \
+	              tqdm \
+	              pandas \
+	              geopandas \
+	              rasterio \
+				  opencv=4.0.0 \
+	&& conda clean -p \
+	&& conda clean -t \
+	&& conda clean --yes --all 
 
-RUN git clone --branch r1.5 https://github.com/tensorflow/models.git /opt/tensorflow-models
-WORKDIR /opt/tensorflow-models/research
-RUN pip install -e .
-RUN protoc object_detection/protos/*.proto --python_out=.
-ENV PYTHONPATH $PYTHONPATH:/opt/tensorflow-models:/opt/tensorflow-models/slim
-ENV PYTHONPATH $PYTHONPATH:/opt/tensorflow-models:/opt/tensorflow-models/research/slim
-# test (do this after container has been created)?
-#RUN python /opt/tensorflow-models/research/object_detection/builders/model_builder_test.py
+				  
+# tf object detection api
+RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
 
+# also need coco api
+# From tensorflow/models/research/
+WORKDIR /tensorflow/models/research/
+RUN wget -O protobuf.zip https://github.com/google/protobuf/releases/download/v3.0.0/protoc-3.0.0-linux-x86_64.zip
+RUN unzip protobuf.zip
+RUN ./bin/protoc object_detection/protos/*.proto --python_out=.
+RUN pip install pycocotools
+
+# From tensorflow/models/research/
+WORKDIR /tensorflow/models/research/
+RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/slim
+ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/research/slim
+
+# # add a jupyter kernel for the conda environment in case it's wanted
+RUN source activate simrdwn2 && python -m ipykernel.kernelspec
+RUN python -m ipykernel.kernelspec
 
 ###################
 # Set up our notebook config.
-WORKDIR /raid/
+WORKDIR /
 # TensorBoard
+# open ports for jupyterlab and tensorboard
+EXPOSE 8888 6006
 RUN ["/bin/bash"]

@@ -8,6 +8,81 @@ Created on Thu Jun 16 14:11:56 2016
 # run nvidia-docker nteractive shell 
 nvidia-docker run -it -v /raid:/raid —name yolt_name darknet 
 
+
+COPY FILES...
+
+# TO DEV BOX
+scp -r /raid/cosmiq/simrdwn2/* 10.123.1.70:/raid/local/src/simrdwn2
+scp -r /raid/cosmiq/simrdwn2/core 10.123.1.70:/raid/local/src/simrdwn2
+scp -r /raid/cosmiq/simrdwn2/yolt2 10.123.1.70:/raid/local/src/simrdwn2
+scp -r /raid/cosmiq/simrdwn2/yolt3 10.123.1.70:/raid/local/src/simrdwn2
+scp -r /raid/cosmiq/simrdwn2/docker* 10.123.1.70:/raid/local/src/simrdwn2/
+scp -r /raid/cosmiq/simrdwn2/configs 10.123.1.70:/raid/local/src/simrdwn2/
+scp -r /raid/cosmiq/simrdwn2/test_images 10.123.1.70:/raid/local/src/simrdwn2/
+scp -r /raid/cosmiq/simrdwn2/yolt 10.123.1.70:/raid/local/src/simrdwn2/
+scp -r /raid/cosmiq/simrdwn2/data 10.123.1.70:/raid/local/src/simrdwn2/
+scp -r /raid/cosmiq/simrdwn2/sequential* 10.123.1.70:/raid/local/src/simrdwn2/
+scp -r /raid/cosmiq/simrdwn2/test_images/*rescale* 10.123.1.70:/raid/local/src/simrdwn2/
+
+# TO GPU07 from mac
+ssh -Y 10.123.1.26
+ssh -Y -i /Users/avanetten/.ssh/ave_ssh 10.123.1.26
+scp -r  -i /Users/avanetten/.ssh/ave_ssh /raid/cosmiq/simrdwn2/* 10.123.1.26:/local_data/simrdwn2
+scp -r  -i /Users/avanetten/.ssh/ave_ssh /raid/cosmiq/simrdwn2/docker* 10.123.1.26:/local_data/simrdwn2/
+scp -r  -i /Users/avanetten/.ssh/ave_ssh /raid/cosmiq/simrdwn2/core 10.123.1.26:/local_data/simrdwn2/
+
+
+# TO GPU07 FROM DEV BOX
+scp -r  -i ~/.ssh/ave_ssh /raid/local/src/simrdwn2/data 10.123.1.26:/local_data/simrdwn2
+scp -r  -i ~/.ssh/ave_ssh /raid/local/src/simrdwn2/results/train_ssd_xview_5cats_v1_native30cm_* 10.123.1.26:/local_data/simrdwn2/results
+
+results/train_ssd_xview_5cats_v1_native30cm_
+
+# copy back
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_*altered*v7* /raid/cosmiq/simrdwn2/results
+
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_yolt_cars_orig* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_ssd_mobi* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_*longtrain* /raid/cosmiq/simrdwn2/results
+
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_ssd*mediumtrain* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_faster*mediumtrain* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_rfcn*600res* /raid/cosmiq/simrdwn2/results
+
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_faster*600res* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid_yolt_* /raid/cosmiq/simrdwn2/results
+
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid*rfcn*batch8* /raid/cosmiq/simrdwn2/results
+scp -r 10.123.1.70:/raid/local/src/simrdwn2/results/valid*faster*batch8* /raid/cosmiq/simrdwn2/results
+
+
+
+
+##########################
+# See notes.txt, yolt_data_prep.py for more info
+
+# for training, yolt replaces "images" with "labels" in path to look for 
+#   labels, so paths must be the same except for that 
+# training images in yolt2/itraining_datasets/"name"/training_data/images
+# training labels must be in in yolt2/itraining_datasets/"name"/training_data/labels
+
+# see data.c.fill_truth_region for assumed data structure
+
+# make sure GPU = 1 in Makefile, run compile_darknet()
+# every time C files are changed, need to run compile_darknet()
+# TO USE GPU X, SET -i X, WHERE X=3-GPU_num 
+
+##########################
+# Labeling and bonunding box settings
+# bounding boxes (run yolt_data_prep.py first)
+# put all images in yolt2/images/boat
+# put all labels in yolt2/labels/boat
+# put list of images in yolt2/data/boat_list2_dev_box.txt
+##########################
+exit
+##########################f
+
 """
 
 from __future__ import print_function
@@ -20,6 +95,10 @@ import numpy as np
 import argparse
 import shutil
 import copy
+import logging
+import tensorflow as tf
+
+#import subprocess
 #import cv2
 #import csv
 #import pickle
@@ -37,8 +116,10 @@ sys.path.append(path_simrdwn_core)
 import slice_im
 import preprocess_tfrecords
 import parse_tfrecord
+import add_geo_coords
 import post_process
 import utils
+
 #import export_model
 #import parse_tfrecord
 #import yolt_post_process
@@ -47,7 +128,7 @@ sys.stdout.flush()
 
 ###############################################################################
 def update_args(args):
-    '''Construct inferred values'''
+    '''Update args (mostly paths)'''
     
     ###########################################################################
     # CONSTRUCT INFERRED VALUES
@@ -60,14 +141,20 @@ def update_args(args):
     # append '/' to end of simrdwn_dir
     #if not args.yolt_dir.endswith('/'): args.yolt_dir += '/'
     #if not args.simrdwn_dir.endswith('/'): args.simrdwn_dir += '/'
+    args.src_dir = os.path.dirname(os.path.realpath(__file__))
     #args.src_dir = os.path.join(args.simrdwn_dir, 'core')
-    args.src_dir = os.path.dirname(os.path.realpath(__file__)) 
-    args.simrdwn_dir = os.path.dirname(args.src_dir) 
+    args.simrdwn_dir = os.path.dirname(args.src_dir)
     args.this_file = os.path.join(args.src_dir, 'simrdwn.py')
     args.results_topdir = os.path.join(args.simrdwn_dir, 'results')
-    args.test_images_dir = os.path.join(args.simrdwn_dir, 'test_images')
-    args.data_dir = os.path.join(args.simrdwn_dir, 'data')
-    args.yolt_dir = os.path.join(args.simrdwn_dir, 'yolt')
+    # if train_data_dir is not a full directory, set it as within simrdwn
+    if args.train_data_dir.startswith('/'):
+        pass
+    else:
+        args.train_data_dir = os.path.join(args.simrdwn_dir, 'train_data')
+    if args.framework.upper().startswith('YOLT'):
+        args.yolt_dir = os.path.join(args.simrdwn_dir, args.framework)
+    else:
+        args.yolt_dir = os.path.join(args.simrdwn_dir, 'yolt')
     args.yolt_weight_dir = os.path.join(args.yolt_dir, 'input_weights')
     args.yolt_cfg_dir = os.path.join(args.yolt_dir, 'cfg')
     args.yolt_plot_file = os.path.join(args.src_dir, 'yolt_plot_loss.py')
@@ -76,19 +163,25 @@ def update_args(args):
     ##########################################
     # Get datetime and set outlog file
     args.now = datetime.datetime.now()
-    args.date_string = args.now.strftime('%Y_%m_%d_%H-%M-%S')
-    #print "Date string:", date_string
-    args.res_name = args.mode + '_' + args.framework + '_' + args.outname \
-                    + '_' + args.date_string
+    if bool(args.append_date_string):
+        args.date_string = args.now.strftime('%Y_%m_%d_%H-%M-%S')
+        #print "Date string:", date_string
+        args.res_name = args.mode + '_' + args.framework + '_' + args.outname \
+                        + '_' + args.date_string
+    else:
+        args.date_string = ''
+        args.res_name = args.mode + '_' + args.framework + '_' + args.outname
+
     args.results_dir = os.path.join(args.results_topdir, args.res_name) 
     args.log_dir = os.path.join(args.results_dir, 'logs')
     args.log_file = os.path.join(args.log_dir, args.res_name + '.log')
     args.yolt_loss_file = os.path.join(args.log_dir, 'yolt_loss.txt')
     args.labels_log_file = os.path.join(args.log_dir, 'labels_list.txt') 
     
-    #args.valid_make_pngs = bool(args.valid_make_pngs)
-    args.valid_make_legend_and_title = bool(args.valid_make_legend_and_title)
-    args.keep_valid_slices = bool(args.keep_valid_slices)
+    #args.test_make_pngs = bool(args.test_make_pngs)
+    args.test_make_legend_and_title = bool(args.test_make_legend_and_title)
+    args.keep_test_slices = bool(args.keep_test_slices)
+    args.test_add_geo_coords = bool(args.test_add_geo_coords)
 
     ##########################
     # set possible extensions for image files
@@ -105,7 +198,10 @@ def update_args(args):
         args.label_map_dict = preprocess_tfrecords.load_pbtxt(args.label_map_path, verbose=False)
     else:
         args.label_map_dict = {}
-    args.label_map_dict_rev = {v: k for k,v in args.label_map_dict.iteritems()}
+    args.label_map_dict_rev = {v: k for k,v in args.label_map_dict.items()}
+    #print ("label_map_dict:", args.label_map_dict)
+
+    #args.label_map_dict_rev = {v: k for k,v in args.label_map_dict.iteritems()}
     
     # infer lists from args
     if len(args.yolt_object_labels_str) == 0:
@@ -118,7 +214,8 @@ def update_args(args):
         if len(args.label_map_path) == 0:
             for itmp,val in enumerate(args.yolt_object_labels):
                 args.label_map_dict[itmp] = val
-            args.label_map_dict_rev = {v: k for k,v in args.label_map_dict.iteritems()}
+            args.label_map_dict_rev = {v: k for k,v in args.label_map_dict.items()}
+            #args.label_map_dict_rev = {v: k for k,v in args.label_map_dict.iteritems()}
 
     # set total dict
     args.label_map_dict_tot = copy.deepcopy(args.label_map_dict)
@@ -126,7 +223,16 @@ def update_args(args):
 
     
     args.yolt_classnum = len(args.yolt_object_labels)
+
+    # for yolov2
     args.yolt_final_output = 1 * 1 * args.boxes_per_grid * (args.yolt_classnum + 4 + 1)
+    # for yolov3
+    # make sure num boxes is divisible by 3
+    if args.framework.upper() == 'YOLT3' and args.boxes_per_grid % 3 != 0:
+        print ("for YOLT3, boxes_per_grid must be divisble by 3!")
+        print ("RETURNING!")
+        return
+    args.yolov3_filters = int(args.boxes_per_grid / 3 * (args.yolt_classnum + 4 + 1))
 
     # plot thresh and slice sizes
     args.plot_thresh = np.array(args.plot_thresh_str.split(args.str_delim)).astype(float)
@@ -138,8 +244,10 @@ def update_args(args):
         args.weight_file_tot = os.path.join(args.yolt_weight_dir, args.weight_file)
     else:    
         args.weight_file_tot = os.path.join(args.results_topdir, args.train_model_path + '/' + args.weight_file)
+        args.tf_cfg_train_file = os.path.join(args.results_topdir, args.train_model_path, args.tf_cfg_train_file)
+    
     args.yolt_cfg_file_tot = os.path.join(args.log_dir, args.yolt_cfg_file)
-    if args.mode == 'valid':
+    if args.mode.upper() == 'TEST':
         # assume weights and cfg are in the training dir
         args.yolt_cfg_file_in = os.path.join(os.path.dirname(args.weight_file_tot), 'logs/', args.yolt_cfg_file)
     else:
@@ -149,7 +257,10 @@ def update_args(args):
 
     ##########################   
     # set training files
-    args.yolt_train_images_list_file_tot = os.path.join(args.data_dir, args.yolt_train_images_list_file)
+    if args.yolt_train_images_list_file.startswith('/'):
+         args.yolt_train_images_list_file_tot = args.yolt_train_images_list_file
+    else:
+        args.yolt_train_images_list_file_tot = os.path.join(args.train_data_dir, args.yolt_train_images_list_file)
     # set tf cfg file out
     tf_cfg_base = os.path.basename(args.tf_cfg_train_file)
     #tf_cfg_root = tf_cfg_base.split('.')[0]
@@ -158,52 +269,53 @@ def update_args(args):
     #args.tf_model_output_directory = os.path.join(args.results_dir, tf_cfg_root)
 
     ##########################
-    # set validation files
+    # set test files
     # first prepend paths to directories
-    #args.valid_weight_dir_tot = os.path.join(args.results_topdir, args.valid_weight_dir)
-    #args.valid_weight_file_tot = args.valid_weight_dir + args.valid_weight_file
+    #args.test_weight_dir_tot = os.path.join(args.results_topdir, args.test_weight_dir)
+    #args.test_weight_file_tot = args.test_weight_dir + args.test_weight_file
     
     # keep raw testims dir if it starts with a '/'
-    if args.valid_testims_dir.startswith('/'):
-        args.valid_testims_dir_tot = args.valid_testims_dir
+    if args.testims_dir.startswith('/'):
+        args.testims_dir_tot = args.testims_dir
     else:
-        args.valid_testims_dir_tot = os.path.join(args.test_images_dir, args.valid_testims_dir)
-        
-    print ("os.listdir(args.valid_testims_dir_tot:", os.listdir(args.valid_testims_dir_tot))
+        args.testims_dir_tot = os.path.join(args.simrdwn_dir, args.testims_dir)
+    #print ("os.listdir(args.testims_dir_tot:", os.listdir(args.testims_dir_tot))
 
     # set test list 
     try:
         if args.nbands == 3:
-            print ("os.listdir(args.valid_testims_dir_tot:", os.listdir(args.valid_testims_dir_tot))
-            args.valid_ims_list = [f for f in os.listdir(args.valid_testims_dir_tot) \
+            #print ("os.listdir(args.testims_dir_tot:", os.listdir(args.testims_dir_tot))
+            args.test_ims_list = [f for f in os.listdir(args.testims_dir_tot) \
                                        if f.endswith(tuple(args.extension_list))]
-            print ("args.valid_ims_list:", args.valid_ims_list)
+            #print ("args.test_ims_list:", args.test_ims_list)
         else:
-            args.valid_ims_list = [f for f in os.listdir(args.valid_testims_dir_tot) \
+            args.test_ims_list = [f for f in os.listdir(args.testims_dir_tot) \
                                        if f.endswith('#1.png')]
     except:
-        args.valid_ims_list = []
-    # more validation files
+        args.test_ims_list = []
+    #print ("test_ims_list:", args.test_ims_list)
+    # more test files
     args.rotate_boxes = bool(args.rotate_boxes)
-    args.yolt_valid_classes_files = [os.path.join(args.results_dir, l + '.txt') \
+    args.yolt_test_classes_files = [os.path.join(args.results_dir, l + '.txt') \
                                            for l in args.yolt_object_labels]
     
-    # set total location of validation image file list
-    args.valid_presliced_list_tot = os.path.join(args.simrdwn_dir, args.valid_presliced_list)
-    if len(args.valid_presliced_tfrecord_part) > 0:
-        args.valid_presliced_tfrecord_tot = os.path.join(args.simrdwn_dir, 
-                                                 args.valid_presliced_tfrecord_part 
-                                                 + '/valid_splitims.tfrecord')
-        args.valid_tfrecord_out = os.path.join(args.results_dir, 'predictions.tfrecord')
+    # set total location of test image file list
+    args.test_presliced_list_tot = os.path.join(args.results_topdir, args.test_presliced_list)
+    #args.test_presliced_list_tot = os.path.join(args.simrdwn_dir, args.test_presliced_list)
+    if len(args.test_presliced_tfrecord_part) > 0:
+        args.test_presliced_tfrecord_tot = os.path.join(args.simrdwn_dir, 
+                                                 args.test_presliced_tfrecord_part 
+                                                 + '/test_splitims.tfrecord')
+        args.test_tfrecord_out = os.path.join(args.results_dir, 'predictions.tfrecord')
     else:
-        args.valid_presliced_tfrecord_tot, args.valid_tfrecord_out  = '', ''
+        args.test_presliced_tfrecord_tot, args.test_tfrecord_out  = '', ''
     
-    if len(args.valid_presliced_list) > 0:
-        args.valid_splitims_locs_file = args.valid_presliced_list_tot
+    if len(args.test_presliced_list) > 0:
+        args.test_splitims_locs_file = args.test_presliced_list_tot
     else:
-        args.valid_splitims_locs_file = os.path.join(args.results_dir, args.valid_splitims_locs_file_root)      
-    #args.valid_tfrecord_file = os.path.join(args.results_dir, args.valid_tfrecord_root)
-    #args.val_prediction_pkl = os.path.join(args.results_dir, args.valid_prediction_pkl_root)
+        args.test_splitims_locs_file = os.path.join(args.results_dir, args.test_splitims_locs_file_root)      
+    #args.test_tfrecord_file = os.path.join(args.results_dir, args.test_tfrecord_root)
+    #args.val_prediction_pkl = os.path.join(args.results_dir, args.test_prediction_pkl_root)
     #args.val_df_tfrecords_out = os.path.join(args.results_dir, 'predictions.tfrecord')
     args.val_df_path_init = os.path.join(args.results_dir, args.val_df_root_init)
     args.val_df_path_aug = os.path.join(args.results_dir, args.val_df_root_aug)
@@ -212,42 +324,48 @@ def update_args(args):
                                                 args.train_model_path \
                                                 + '/frozen_model/frozen_inference_graph.pb')
     ##########################
-    # get second validation classifier values
+    # get second test classifier values
     args.slice_sizes2 = []
     if len(args.label_map_path2) > 0:
 
         # label dict
         args.label_map_dict2 = preprocess_tfrecords.load_pbtxt(args.label_map_path2, verbose=False)
-        args.label_map_dict_rev2 = {v: k for k,v in args.label_map_dict2.iteritems()}
+        args.label_map_dict_rev2 = {v: k for k,v in args.label_map_dict2.items()}
+        #args.label_map_dict_rev2 = {v: k for k,v in args.label_map_dict2.iteritems()}
         
         # to update label_map_dict just adds second classifier to first
         nmax_tmp = max(args.label_map_dict.keys())
-        for ktmp, vtmp in args.label_map_dict2.iteritems():
+        for ktmp, vtmp in args.label_map_dict2.items():
+        #for ktmp, vtmp in args.label_map_dict2.iteritems():
             args.label_map_dict_tot[ktmp+nmax_tmp] = vtmp
-        args.label_map_dict_rev_tot = {v: k for k,v in args.label_map_dict_tot.iteritems()}
+        args.label_map_dict_rev_tot = {v: k for k,v in args.label_map_dict_tot.items()}
+        #args.label_map_dict_rev_tot = {v: k for k,v in args.label_map_dict_tot.iteritems()}
         
         # infer lists from args
         args.yolt_object_labels2 = [args.label_map_dict2[ktmp] for ktmp in sorted(args.label_map_dict2.keys())]
         args.yolt_object_labels_str2 = ','.join(args.yolt_object_labels2)
 
         # set classnum and final output
-        args.classnum2 = len(args.yolt_object_labels2)
-        args.yolt_final_output2 = 1 * 1 * args.boxes_per_grid * (args.classnum2 + 4 + 1)
+        args.yolt_classnum2 = len(args.yolt_object_labels2)
+        # for yolov2
+        args.yolt_final_output2 = 1 * 1 * args.boxes_per_grid * (args.yolt_classnum2 + 4 + 1)
+        # for yolov3
+        args.yolov3_filters2 = int(args.boxes_per_grid / 3 * (args.yolt_classnum2 + 4 + 1))
 
         # plot thresh and slice sizes
         args.plot_thresh2 = np.array(args.plot_thresh_str2.split(args.str_delim)).astype(float)
         args.slice_sizes2 = np.array(args.slice_sizes_str2.split(args.str_delim)).astype(int)
 
-        # validation files2
-        args.yolt_valid_classes_files2 = [os.path.join(args.results_dir, l + '.txt') \
+        # test files2
+        args.yolt_test_classes_files2 = [os.path.join(args.results_dir, l + '.txt') \
                                                for l in args.yolt_object_labels2]
-        if len(args.valid_presliced_list2) > 0:
-            args.valid_presliced_list_tot2 = os.path.join(args.simrdwn_dir, args.valid_presliced_list2)
+        if len(args.test_presliced_list2) > 0:
+            args.test_presliced_list_tot2 = os.path.join(args.simrdwn_dir, args.test_presliced_list2)
         else:
-            args.valid_splitims_locs_file2 = os.path.join(args.results_dir, args.valid_splitims_locs_file_root2)      
-        #args.val_prediction_pkl2 = os.path.join(args.results_dir, args.valid_prediction_pkl_root2)
+            args.test_splitims_locs_file2 = os.path.join(args.results_dir, args.test_splitims_locs_file_root2)      
+        #args.val_prediction_pkl2 = os.path.join(args.results_dir, args.test_prediction_pkl_root2)
         #args.val_df_tfrecords_out2 = os.path.join(args.results_dir, 'predictions2.tfrecord')
-        args.valid_tfrecord_out2 = os.path.join(args.results_dir, 'predictions2.tfrecord')
+        args.test_tfrecord_out2 = os.path.join(args.results_dir, 'predictions2.tfrecord')
         args.val_df_path_init2 = os.path.join(args.results_dir, args.val_df_root_init2)
         args.val_df_path_aug2 = os.path.join(args.results_dir, args.val_df_root_aug2)
         args.weight_file_tot2 = os.path.join(args.results_topdir, args.train_model_path + '/' + args.weight_file2)
@@ -255,7 +373,7 @@ def update_args(args):
         #args.weight_file_tot2 = os.path.join(args.weight_dir2, args.weight_file2)
         args.yolt_cfg_file_tot2 = os.path.join(args.log_dir, args.yolt_cfg_file2)
 
-        if args.mode == 'valid':
+        if args.mode == 'test':
             args.yolt_cfg_file_in2 = os.path.join(os.path.dirname(args.weight_file_tot2), 'logs/', args.yolt_cfg_file2)
         else:
             args.yolt_cfg_file_in2 = os.path.join(args.yolt_cfg_dir, args.yolt_cfg_file2)
@@ -265,35 +383,22 @@ def update_args(args):
                                                 + '/frozen_model/frozen_inference_graph.pb')
 
     
-    # total validation
+    # total test
     args.val_df_path_tot = os.path.join(args.results_dir, args.val_df_root_tot)
-    #args.val_prediction_pkl_tot = os.path.join(args.results_dir, args.valid_prediction_pkl_root_tot)
+    #args.val_prediction_pkl_tot = os.path.join(args.results_dir, args.test_prediction_pkl_root_tot)
     args.val_prediction_df_refine_tot = os.path.join(args.results_dir, 
                                                      args.val_prediction_df_refine_tot_root_part +
                                                      '_thresh=' + str(args.plot_thresh[0])) 
+
+    # if evaluating spacenet
+    if len(args.building_csv_file) > 0:
+        args.building_csv_file = os.path.join(args.results_dir, args.building_csv_file)
 
     ##########################
     # Plotting params
     args.figsize = (12,12)
     args.dpi = 300
 
-    ##########################
-    # yolt test settings, assume test images are in test_images
-    args.yolt_test_im_tot = os.path.join(args.test_images_dir, args.yolt_test_im)
-    #args.testweight_file = args.weight_dir + args.testweight_file
-    # populate test_labels
-    test_labels_list = []
-    if args.mode == 'test':
-        # populate labels
-        with open(os.path.join(args.data_dir, args.test_labels), 'rb') as fin:
-            for l in fin.readlines():
-                # spaces in names screws up the argc in yolt.c
-                test_labels_list.append(l[:-1].replace(' ', '_'))
-        # overwrite yolt_object_labels, and yolt_object_labels_str
-        args.yolt_object_labels = test_labels_list
-        args.yolt_object_labels_str = ','.join([str(ltmp) for ltmp in \
-                                           test_labels_list])
-        
     # set side length from cfg root, classnum, and final output
     # default to length of 13
     #try:
@@ -303,8 +408,8 @@ def update_args(args):
            
     # set yolt_cfg_file, assume raw cfgs are in cfg directory, and the cfg file
     #   will be copied to log_dir.  Use the cfg in logs as input to yolt.c
-    #   with valid, cfg will be in results_dir/logs/
-    # if using valid, assume cfg file is in valid_weight_dir, else, assume
+    #   with test, cfg will be in results_dir/logs/
+    # if using test, assume cfg file is in test_weight_dir, else, assume
     #   it's in yolt_dir/cfg/
     # also set weight file
     
@@ -322,11 +427,11 @@ def update_args(args):
 
         
     ## initialize val files to empty
-    #figname_val = ''#results_dir + valid_image + '_valid_thresh=' + str(plot_thresh) + '.png'
-    #pkl_val = ''#results_dir + valid_image + '_boxes_thresh=' + str(plot_thresh) + '.pkl'
-    #valid_image = ''
-    #valid_im,  valid_files, yolt_valid_classes_files = [],[],[]
-    #valid_dir, valid_splitims_locs_file = '', ''
+    #figname_val = ''#results_dir + test_image + '_test_thresh=' + str(plot_thresh) + '.png'
+    #pkl_val = ''#results_dir + test_image + '_boxes_thresh=' + str(plot_thresh) + '.pkl'
+    #test_image = ''
+    #test_im,  test_files, yolt_test_classes_files = [],[],[]
+    #test_dir, test_splitims_locs_file = '', ''
     ###########################
     
     return args
@@ -334,7 +439,8 @@ def update_args(args):
 
 ###############################################################################
 def update_tf_train_config(config_file_in, config_file_out,
-                     label_map_path='', train_tf_record='', 
+                     label_map_path='',  train_tf_record='', 
+                     train_input_width=416, train_input_height=416, 
                      train_val_tf_record='', num_steps=10000,
                      batch_size=32,
                      verbose=False):
@@ -345,13 +451,23 @@ def update_tf_train_config(config_file_in, config_file_out,
 		https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/configuring_jobs.md 
 	For example .config files:
 		https://github.com/tensorflow/models/tree/master/research/object_detection/samples/configs
-		also located at: /cosmiq/simrdwn/configs
+		also located at: /raid/cosmiq/simrdwn2/configs
 
     to test:
-        config_file_in = '/cosmiq/simrdwn/tf/configs/faster_rcnn_inception_v2_simrdwn.config'
-        config_file_out = '/cosmiq/simrdwn/tf/configs/faster_rcnn_inception_v2_simrdwn_tmp.config'
+        config_file_in = '/raid/cosmiq/simrdwn2/tf/configs/faster_rcnn_inception_v2_simrdwn.config'
+        config_file_out = '/raid/cosmiq/simrdwn2/tf/configs/faster_rcnn_inception_v2_simrdwn_tmp.config'
     '''
         
+    #############
+    # for now, set train_val_tf_record to train_tf_record!
+    train_val_tf_record = train_tf_record
+    #############
+
+    # load pbtxt
+    label_map_dict = preprocess_tfrecords.load_pbtxt(label_map_path, verbose=False)
+    n_classes = len(list(label_map_dict.keys()))
+
+    #print ("config_file_in:", config_file_in)
     fin = open(config_file_in, 'r')
     fout = open(config_file_out, 'w')   
     line_minus_two = ''
@@ -380,7 +496,15 @@ def update_tf_train_config(config_file_in, config_file_out,
 
         elif line.strip().startswith('num_steps:'):
             line_out = '  num_steps: ' + str(num_steps) + '\n'
-
+        # resizer
+        elif line.strip().startswith('height:'):
+            line_out = '        height: ' + str(train_input_height) + '\n'
+        elif line.strip().startswith('width:'):
+            line_out = '        width: ' + str(train_input_width) + '\n'
+        # n classes
+        elif line.strip().startswith('num_classes:'):
+            line_out = '    num_classes: ' + str(n_classes) + '\n'
+            
         else:
             line_out = line
         fout.write(line_out)
@@ -389,20 +513,20 @@ def update_tf_train_config(config_file_in, config_file_out,
     fout.close() 
 
 ###############################################################################
-def tf_train_cmd(tf_cfg_train_file, results_dir):#, log_file):
+def tf_train_cmd(tf_cfg_train_file, results_dir, max_batches=10000):#, log_file):
     '''Train a model with tensorflow object detection api
     nohup python /opt/tensorflow-models/research/object_detection/train.py \
 			    --logtostderr \
-			    --pipeline_config_path=/raid/local/src/simrdwn/tf/configs/ssd_inception_v2_simrdwn.config \
-			    --train_dir=/raid/local/src/simrdwn/outputs/ssd >> \
+			    --pipeline_config_path=/raid/local/src/simrdwn2/tf/configs/ssd_inception_v2_simrdwn.config \
+			    --train_dir=/raid/local/src/simrdwn2/outputs/ssd >> \
 				train_ssd_inception_v2_simrdwn.log & tail -f train_ssd_inception_v2_simrdwn.log
                 
     nohup python /opt/tensorflow-models/research/object_detection/train.py 
     --logtostderr 
-    --pipeline_config_path=/raid/local/src/simrdwn/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37/ssd_inception_v2_simrdwn.config 
-    --train_dir=/raid/local/src/simrdwn/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37  >> 
-    /raid/local/src/simrdwn/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37/logs/train_ssd_ssd_train_3class_2018_01_24_05-28-37.log 
-    & tail -f /raid/local/src/simrdwn/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37/logs/train_ssd_ssd_train_3class_2018_01_24_05-28-37.log
+    --pipeline_config_path=/raid/local/src/simrdwn2/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37/ssd_inception_v2_simrdwn.config 
+    --train_dir=/raid/local/src/simrdwn2/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37  >> 
+    /raid/local/src/simrdwn2/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37/logs/train_ssd_ssd_train_3class_2018_01_24_05-28-37.log 
+    & tail -f /raid/local/src/simrdwn2/results/train_ssd_ssd_train_3class_2018_01_24_05-28-37/logs/train_ssd_ssd_train_3class_2018_01_24_05-28-37.log
 
     '''
     
@@ -410,14 +534,39 @@ def tf_train_cmd(tf_cfg_train_file, results_dir):#, log_file):
     #suffix =  >> ' + log_file
     suffix = ''
 
+    # https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_locally.md
+    #PIPELINE_CONFIG_PATH={path to pipeline config file}
+    #MODEL_DIR={path to model directory}
+    #NUM_TRAIN_STEPS=50000
+    #SAMPLE_1_OF_N_EVAL_EXAMPLES=1
+    #python object_detection/model_main.py \
+    #    --pipeline_config_path=${PIPELINE_CONFIG_PATH} \
+    #    --model_dir=${MODEL_DIR} \
+    #    --num_train_steps=${NUM_TRAIN_STEPS} \
+    #    --sample_1_of_n_eval_examples=$SAMPLE_1_OF_N_EVAL_EXAMPLES \
+    #    --alsologtostderr
     cmd_arg_list = [
             'python',
-            '/opt/tensorflow-models/research/object_detection/train.py',
-            '--logtostderr',
+            '/tensorflow/models/research/object_detection/model_main.py',            
             '--pipeline_config_path=' + tf_cfg_train_file,
-            '--train_dir=' + results_dir,
+            '--model_dir=' + results_dir,
+            '--num_train_steps=' + str(int(max_batches)),
+            #'--sample_1_of_n_eval_examples=' + str(int(1)), 
+            '--sample_1_of_n_eval_examples={}'.format(1),
+            '--alsologtostderr',
             suffix
             ]
+            
+    ## old version of tensorflow
+    #cmd_arg_list = [
+    #        'python',
+    #        '/opt/tensorflow-models/research/object_detection/train.py',
+    #        '--logtostderr',
+    #        '--pipeline_config_path=' + tf_cfg_train_file,
+    #        '--train_dir=' + results_dir,
+    #        suffix
+    #        ]
+    
     
     cmd = ' '.join(cmd_arg_list)
       
@@ -439,7 +588,8 @@ def tf_export_model_cmd(trained_dir='', tf_cfg_train_file='pipeline.config',
 
     cmd_arg_list = [
             'python',
-            '/opt/tensorflow-models/research/object_detection/export_inference_graph.py',
+            '/tensorflow/models/research/object_detection/export_inference_graph.py',            
+            #'/opt/tensorflow-models/research/object_detection/export_inference_graph.py',
             '--input_type image_tensor',
             '--pipeline_config_path=' + os.path.join(trained_dir, tf_cfg_train_file),
             '--trained_checkpoint_prefix=' + os.path.join(trained_dir, 'model.ckpt-' + str(num_max_tmp)),
@@ -461,16 +611,16 @@ def tf_infer_cmd_dual(inference_graph_path='',
                           GPU=0,
                           BGR2RGB=0,
                           output_csv_path='',
-                          infer_src_path='/raid/local/src/simrdwn/core'):
-                          #infer_src_path='/raid/local/src/simrdwn/src/infer_detections.py'):
+                          infer_src_path='/raid/local/src/simrdwn2/core'):
+                          #infer_src_path='/raid/local/src/simrdwn2/src/infer_detections.py'):
     '''
     Run infer_detections.py with the given input tfrecord or input_file_list
     
     Infer output tfrecord
-    		python /raid/local/src/simrdwn/src/infer_detections.py \
-		--input_tfrecord_paths=/raid/local/src/simrdwn/data/qgis_labels_car_boat_plane_val.tfrecord \
-		--inference_graph=/raid/local/src/simrdwn/outputs/ssd/output_inference_graph/frozen_inference_graph.pb \
-		--output_tfrecord_path=/raid/local/src/simrdwn/outputs/ssd/val_detections_ssd.tfrecord 
+    		python /raid/local/src/simrdwn2/src/infer_detections.py \
+		--input_tfrecord_paths=/raid/local/src/simrdwn2/data/qgis_labels_car_boat_plane_val.tfrecord \
+		--inference_graph=/raid/local/src/simrdwn2/outputs/ssd/output_inference_graph/frozen_inference_graph.pb \
+		--output_tfrecord_path=/raid/local/src/simrdwn2/outputs/ssd/val_detections_ssd.tfrecord 
      df.to_csv(outfile_df)
     '''
     
@@ -497,7 +647,8 @@ def tf_infer_cmd_dual(inference_graph_path='',
 
 
 ###############################################################################
-def yolt_command(yolt_cfg_file_tot='',
+def yolt_command(framework='yolt2',
+                 yolt_cfg_file_tot='',
                  weight_file_tot='',
                  results_dir='',
                  log_file='',
@@ -509,7 +660,7 @@ def yolt_command(yolt_cfg_file_tot='',
                  gpu=0,
                  single_gpu_machine=0,
                  yolt_train_images_list_file_tot='',
-                 valid_splitims_locs_file='',
+                 test_splitims_locs_file='',
                  test_im_tot='',
                  test_thresh=0.2,
                  yolt_nms_thresh=0,
@@ -528,8 +679,8 @@ def yolt_command(yolt_cfg_file_tot='',
     float nms_thresh = (argc > 7) ? atof(argv[7]): 0;
     char *train_images = (argc > 8) ? argv[8]: 0;
     char *results_dir = (argc > 9) ? argv[9]: 0;
-    //char *valid_image = (argc >10) ? argv[10]: 0;
-    char *valid_list_loc = (argc > 10) ? argv[10]: 0;
+    //char *test_image = (argc >10) ? argv[10]: 0;
+    char *test_list_loc = (argc > 10) ? argv[10]: 0;
     char *names_str = (argc > 11) ? argv[11]: 0;
     int len_names = (argc > 12) ? atoi(argv[12]): 0;
     int nbands = (argc > 13) ? atoi(argv[13]): 0;
@@ -548,6 +699,7 @@ def yolt_command(yolt_cfg_file_tot='',
     # SET VARIABLES ACCORDING TO MODE (SET UNNECCESSARY VALUES TO 0 OR NULL)      
     # set train prams (and prefix, and suffix)
     if mode == 'train':
+        mode_str = 'train'
         train_ims = yolt_train_images_list_file_tot
         prefix = 'nohup'
         suffix = ' >> ' + log_file + ' & tail -f ' + log_file
@@ -556,31 +708,32 @@ def yolt_command(yolt_cfg_file_tot='',
         prefix = ''
         suffix =  ' 2>&1 | tee -a ' + log_file
         
-    # set test params
-    if mode == 'test':
+    # set test deprecated params
+    if mode == 'test_deprecated':
         test_im = test_im_tot
         test_thresh = test_thresh
     else:
         test_im = 'null'
         test_thresh = 0
     
-    # set valid params
-    if mode == 'valid':
-        #valid_image = args.valid_image_tmp
-        valid_list_loc = valid_splitims_locs_file
+    # set test params
+    if mode == 'test':
+        mode_str = 'valid'
+        #test_image = args.test_image_tmp
+        test_list_loc = test_splitims_locs_file
     else:
-        #valid_image = 'null'
-        valid_list_loc = 'null'
+        #test_image = 'null'
+        test_list_loc = 'null'
             
     
     ##########################
 
     c_arg_list = [
             prefix,
-            './yolt/darknet',
+            './' + framework.lower() + '/darknet',
             gpu_cmd,
-            'yolt2',
-            mode,
+            framework, #'yolt2',
+            mode_str,
             yolt_cfg_file_tot,
             weight_file_tot,
             test_im,
@@ -588,7 +741,7 @@ def yolt_command(yolt_cfg_file_tot='',
             str(yolt_nms_thresh),
             train_ims,
             results_dir,
-            valid_list_loc,
+            test_list_loc,
             yolt_object_labels_str,
             str(yolt_classnum),
             str(nbands),
@@ -618,7 +771,9 @@ def recompile_darknet(yolt_dir):
     utils.run_cmd(cmd_compile1)    
         
 ###############################################################################
-def replace_yolt_vals_train_compile(yolt_dir='', mode='train', 
+def replace_yolt_vals_train_compile(framework='yolt2', 
+                              yolt_dir='', 
+                              mode='train', 
                               yolt_cfg_file_tot='',
                               yolt_final_output='',
                               yolt_classnum=2,
@@ -627,8 +782,9 @@ def replace_yolt_vals_train_compile(yolt_dir='', mode='train',
                               batch_size=16,
                               subdivisions=4,
                               boxes_per_grid=5,
-                              yolt_input_width=416,
-                              yolt_input_height=416,
+                              train_input_width=416,
+                              train_input_height=416,
+                              yolov3_filters=0,
                               use_GPU=1,
                               use_opencv=1,
                               use_CUDNN=1):
@@ -638,6 +794,8 @@ def replace_yolt_vals_train_compile(yolt_dir='', mode='train',
     editing of network layers must be done in vi, this function just changes 
     parameters such as window size, number of trianing steps, etc'''
         
+    print ("Replacing YOLT vals...")
+    
     #################
     # Makefile
     if mode == 'compile':
@@ -666,6 +824,7 @@ def replace_yolt_vals_train_compile(yolt_dir='', mode='train',
     # cfg file
     elif mode == 'train':
         yoltcfg = yolt_cfg_file_tot
+        #print ("\n\nyolt_cfg_file_tot:", yolt_cfg_file_tot)
         yoltcfg_tmp = yoltcfg + 'tmp'
         f1 = open(yoltcfg, 'r')
         f2 = open(yoltcfg_tmp, 'w')    
@@ -675,7 +834,14 @@ def replace_yolt_vals_train_compile(yolt_dir='', mode='train',
         sout = []
         
         fixed_output = False
-        for line in s:
+        for i,line in enumerate(s):
+           # print ("line:", line)
+
+            if i > 3:
+                lm4 = sout[i-4]
+            else:
+                lm4 = ''
+            
             #if line.strip().startswith('side='):
             #    line_out='side=' + str(side) + '\n'
             if line.strip().startswith('channels='):
@@ -687,20 +853,30 @@ def replace_yolt_vals_train_compile(yolt_dir='', mode='train',
             elif line.strip().startswith('batch='):
                 line_out = 'batch=' + str(batch_size) + '\n'  
             elif line.strip().startswith('subdivisions='):
-                line_out = 'subdivisions=' + str(subdivisions) + '\n'  
-            elif line.strip().startswith('num='):
+                line_out = 'subdivisions=' + str(subdivisions) + '\n' 
+            
+            # replace num in yolov2
+            elif (framework == 'yolt2') and (line.strip().startswith('num=')):
                 line_out = 'num=' + str(boxes_per_grid) + '\n'         
-            elif line.strip().startswith('width='):
-                line_out = 'width=' + str(yolt_input_width) + '\n'         
-            elif line.strip().startswith('height='):
-                line_out = 'height=' + str(yolt_input_height) + '\n'         
+            elif (framework in ['yolt2', 'yolt3']) and line.strip().startswith('width='):
+                line_out = 'width=' + str(train_input_width) + '\n'         
+            elif (framework in ['yolt2', 'yolt3']) and line.strip().startswith('height='):
+                line_out = 'height=' + str(train_input_height) + '\n'         
             # change final output, and set fixed to true
             #elif (line.strip().startswith('output=')) and (not fixed_output):
             #    line_out = 'output=' + str(final_output) + '\n'
             #    fixed_output=True
-            elif (line.strip().startswith('filters=')) and (not fixed_output):
+            elif (framework.lower() == 'yolt2') and (line.strip().startswith('filters=')) and (not fixed_output):
                 line_out = 'filters=' + str(yolt_final_output) + '\n'
                 fixed_output=True                
+
+            # line before a yolo layer should have 3 * (n_classes + 5) filters
+            elif (framework.lower() == 'yolt3') and (line.strip().startswith('filters=')) and (lm4.startswith('[yolo]')):
+                line_out = 'filters=' + str(yolov3_filters) + '\n'
+                print (i, "lm4:", lm4, "line_out:", line_out)
+                print ("args.yolov3_filters", yolov3_filters)
+                #return
+                                     
             else:
                 line_out = line
             sout.append(line_out)
@@ -723,19 +899,19 @@ def replace_yolt_vals_train_compile(yolt_dir='', mode='train',
     
 
 ###############################################################################
-def split_valid_im(im_root_with_ext, valid_testims_dir_tot, results_dir,
+def split_test_im(im_root_with_ext, testims_dir_tot, results_dir,
                    log_file,
                    slice_sizes=[416],
                    slice_overlap=0.2,
-                   valid_slice_sep='__',
+                   test_slice_sep='__',
                    zero_frac_thresh=0.5,
                    ):
     
-    '''split files for valid step
+    '''split files for test step
     Assume input string has no path, but does have extension (e.g:, 'pic.png')
     
-    1. get image path (args.valid_image_tmp) from image root name 
-            (args.valid_image_tmp)
+    1. get image path (args.test_image_tmp) from image root name 
+            (args.test_image_tmp)
     2. slice test image and move to results dir
 
     '''
@@ -743,122 +919,122 @@ def split_valid_im(im_root_with_ext, valid_testims_dir_tot, results_dir,
     
     # get image root, make sure there is no extension
     im_root = im_root_with_ext.split('.')[0]
-    im_path = os.path.join(valid_testims_dir_tot, im_root_with_ext)
+    im_path = os.path.join(testims_dir_tot, im_root_with_ext)
     
-    # slice validation plot into manageable chunks
+    # slice test plot into manageable chunks
     
     # slice (if needed)
     if slice_sizes[0] > 0:
     #if len(args.slice_sizes) > 0:
-        # create valid_splitims_locs_file 
-        # set valid_dir as in results_dir
-        valid_split_dir = os.path.join(results_dir,  im_root + '_split' + '/')
-        valid_dir_str = '"Valid_split_dir: ' +  valid_split_dir + '\n"'
-        print ("Valid_dir:", valid_dir_str[1:-2])
-        os.system('echo ' + valid_dir_str + ' >> ' + log_file)
-        #print "valid_split_dir:", valid_split_dir
+        # create test_splitims_locs_file 
+        # set test_dir as in results_dir
+        test_split_dir = os.path.join(results_dir,  im_root + '_split' + '/')
+        test_dir_str = '"test_split_dir: ' +  test_split_dir + '\n"'
+        print ("test_dir:", test_dir_str[1:-2])
+        os.system('echo ' + test_dir_str + ' >> ' + log_file)
+        #print "test_split_dir:", test_split_dir
         
         # clean out dir, and make anew
-        if os.path.exists(valid_split_dir):
-            if (not valid_split_dir.startswith(results_dir)) \
-                    or len(valid_split_dir) < len(results_dir) \
-                    or len(valid_split_dir) < 10:
-                print ("valid_split_dir too short!!!!:", valid_split_dir)
+        if os.path.exists(test_split_dir):
+            if (not test_split_dir.startswith(results_dir)) \
+                    or len(test_split_dir) < len(results_dir) \
+                    or len(test_split_dir) < 10:
+                print ("test_split_dir too short!!!!:", test_split_dir)
                 return
-            shutil.rmtree(valid_split_dir, ignore_errors=True)
-        os.mkdir(valid_split_dir)
+            shutil.rmtree(test_split_dir, ignore_errors=True)
+        os.mkdir(test_split_dir)
 
         # slice
         for s in slice_sizes:
             slice_im.slice_im(im_path, im_root, 
-                              valid_split_dir, s, s, 
+                              test_split_dir, s, s, 
                               zero_frac_thresh=zero_frac_thresh, 
                               overlap=slice_overlap,
-                              slice_sep=valid_slice_sep)
-            valid_files = [os.path.join(valid_split_dir, f) for \
-                                   f in os.listdir(valid_split_dir)]
-        n_files_str = '"Num files: ' + str(len(valid_files)) + '\n"'
+                              slice_sep=test_slice_sep)
+            test_files = [os.path.join(test_split_dir, f) for \
+                                   f in os.listdir(test_split_dir)]
+        n_files_str = '"Num files: ' + str(len(test_files)) + '\n"'
         print (n_files_str[1:-2])
         os.system('echo ' + n_files_str + ' >> ' + log_file)
         
     else:
-        valid_files = [im_path]
-        valid_split_dir = os.path.join(results_dir, 'nonsense')
+        test_files = [im_path]
+        test_split_dir = os.path.join(results_dir, 'nonsense')
 
-    return valid_files, valid_split_dir
+    return test_files, test_split_dir
 
 
 ###############################################################################
-def prep_valid_files(results_dir, log_file, valid_ims_list, 
-              valid_testims_dir_tot, valid_splitims_locs_file,
+def prep_test_files(results_dir, log_file, test_ims_list, 
+              testims_dir_tot, test_splitims_locs_file,
               slice_sizes=[416],
               slice_overlap=0.2,
-              valid_slice_sep='__',
+              test_slice_sep='__',
               zero_frac_thresh=0.5,
               ):
     '''Split images and save split image locations to txt file'''
         
-    # split validation images, store locations 
+    # split test images, store locations 
     t0 = time.time()
-    valid_split_str = '"Splitting validation files...\n"'
-    print (valid_split_str[1:-2])
-    os.system('echo ' + valid_split_str + ' >> ' + log_file)
-    print ("valid_ims_list:", valid_ims_list)
+    test_split_str = '"Splitting test files...\n"'
+    print (test_split_str[1:-2])
+    os.system('echo ' + test_split_str + ' >> ' + log_file)
+    print ("test_ims_list:", test_ims_list)
 
-    valid_files_locs_list = []
-    valid_split_dir_list = []
+    test_files_locs_list = []
+    test_split_dir_list = []
     # !! Should make a tfrecord when we split files, instead of doing it later 
-    for i,valid_base_tmp in enumerate(valid_ims_list):
+    for i,test_base_tmp in enumerate(test_ims_list):
         iter_string = '"\n' + str(i+1) + ' / ' + \
-            str(len(valid_ims_list)) + '\n"'
+            str(len(test_ims_list)) + '\n"'
         print (iter_string[1:-2])
         os.system('echo ' + iter_string + ' >> ' + log_file)
-        #print "\n", i+1, "/", len(args.valid_ims_list)
+        #print "\n", i+1, "/", len(args.test_ims_list)
         
         # dirty hack: ignore file extensions for now
-        #valid_base_tmp_noext = valid_base_tmp.split('.')[0]
-        #valid_base_string = '"valid_base_tmp_noext:' \
-        #                    + str(valid_base_tmp_noext) + '\n"'
-        valid_base_string = '"valid_file: ' + str(valid_base_tmp) + '\n"'
-        print (valid_base_string[1:-2])
-        os.system('echo ' + valid_base_string + ' >> ' + log_file)
+        #test_base_tmp_noext = test_base_tmp.split('.')[0]
+        #test_base_string = '"test_base_tmp_noext:' \
+        #                    + str(test_base_tmp_noext) + '\n"'
+        test_base_string = '"test_file: ' + str(test_base_tmp) + '\n"'
+        print (test_base_string[1:-2])
+        os.system('echo ' + test_base_string + ' >> ' + log_file)
         
         # split data 
-        #valid_files_list_tmp, valid_split_dir_tmp = split_valid_im(valid_base_tmp, args)
-        valid_files_list_tmp, valid_split_dir_tmp = \
-                split_valid_im(valid_base_tmp, valid_testims_dir_tot, 
+        #test_files_list_tmp, test_split_dir_tmp = split_test_im(test_base_tmp, args)
+        test_files_list_tmp, test_split_dir_tmp = \
+                split_test_im(test_base_tmp, testims_dir_tot, 
                                results_dir, log_file,
                                slice_sizes=slice_sizes,
                                slice_overlap=slice_overlap,
-                               valid_slice_sep=valid_slice_sep,
+                               test_slice_sep=test_slice_sep,
                                zero_frac_thresh=zero_frac_thresh)
-        # add valid_files to list
-        valid_files_locs_list.extend(valid_files_list_tmp)
-        valid_split_dir_list.append(valid_split_dir_tmp)
+        # add test_files to list
+        test_files_locs_list.extend(test_files_list_tmp)
+        test_split_dir_list.append(test_split_dir_tmp)
 
-    # swrite valid_files_locs_list to file (file = valid_splitims_locs_file)
-    print ("Total len valid files:", len(valid_files_locs_list))
-    print ("valid_splitims_locs_file:", valid_splitims_locs_file)
-    # write list of files to valid_splitims_locs_file
-    with open (valid_splitims_locs_file, "wb") as fp:
-       for line in valid_files_locs_list:
+    # swrite test_files_locs_list to file (file = test_splitims_locs_file)
+    print ("Total len test files:", len(test_files_locs_list))
+    print ("test_splitims_locs_file:", test_splitims_locs_file)
+    # write list of files to test_splitims_locs_file
+    with open (test_splitims_locs_file, "w") as fp:
+       for line in test_files_locs_list:
            if not line.endswith('.DS_Store'):
                fp.write(line + "\n")
 
     t1 = time.time()
-    cmd_time_str = '"\nLength of time to split valid files: ' \
+    cmd_time_str = '"\nLength of time to split test files: ' \
                     + str(t1 - t0) + ' seconds\n"'
-    print(cmd_time_str)
+    print(cmd_time_str[1:-2])
     os.system('echo ' + cmd_time_str + ' >> ' + log_file)
                
-    return valid_files_locs_list, valid_split_dir_list
+    return test_files_locs_list, test_split_dir_list
 
 ###############################################################################
-#def run_valid(framework, infer_cmd, results_dir, log_file, 
-#              valid_files_locs_list, valid_split_dir_list,
+#def run_test(framework, infer_cmd, results_dir, log_file, 
+#              test_files_locs_list, test_split_dir_list,
 #              slice_sizes=[416],
-#              valid_testims_dir_tot='',
-#              yolt_valid_classes_files='', 
+#              testims_dir_tot='',
+#              yolt_test_classes_files='', 
 #              val_df_path_init='',
 #              val_df_path_aug='',
 #              label_map_dict={},
@@ -869,39 +1045,39 @@ def prep_valid_files(results_dir, log_file, valid_ims_list,
 #              val_df_path_init='',
 #              val_df_path_aug='',
 #              # slicing and plotting#              # slicing and plotting
-#              valid_slice_sep='__',
-#              edge_buffer_valid=1,
+#              test_slice_sep='__',
+#              edge_buffer_test=1,
 #              max_edge_aspect_ratio=4,
-#              valid_box_rescale_frac=1.0,
+#              test_box_rescale_frac=1.0,
 #              rotate_boxes=False,
 #              plot_thresh=0.33,
 #              nms_overlap_thresh=0.5,
 #              show_labels=True,
 #              alpha_scaling=True,
 #              plot_line_thickness=2,
-#              keep_valid_slices='False',
+#              keep_test_slices='False',
 #              ):
 #    '''Evaluate multiple large images'''
     
 ###############################################################################
-def run_valid(framework='YOLT', 
+def run_test(framework='YOLT2', 
               infer_cmd='', 
               results_dir='', 
               log_file='',
-              #valid_files_locs_list=[], #valid_split_dir_list,
-              #valid_presliced_tfrecord_tot='',
+              #test_files_locs_list=[], #test_split_dir_list,
+              #test_presliced_tfrecord_tot='',
               n_files=0,
-              valid_tfrecord_out='',
+              test_tfrecord_out='',
               slice_sizes=[416],
-              valid_testims_dir_tot='',
-              yolt_valid_classes_files='', 
+              testims_dir_tot='',
+              yolt_test_classes_files='', 
               label_map_dict={},
               val_df_path_init='',
               #val_df_path_aug='',
-              valid_slice_sep='__',
-              edge_buffer_valid=1,
+              test_slice_sep='__',
+              edge_buffer_test=1,
               max_edge_aspect_ratio=4,
-              valid_box_rescale_frac=1.0,
+              test_box_rescale_frac=1.0,
               rotate_boxes=False,
               min_retain_prob=0.05,
               #plot_thresh=0.33,
@@ -909,7 +1085,9 @@ def run_valid(framework='YOLT',
               #show_labels=True,
               #alpha_scaling=True,
               #plot_line_thickness=2,
-              #keep_valid_slices='False',
+              #keep_test_slices='False',
+              test_add_geo_coords=True,
+              verbose=False
               ):
     '''Evaluate multiple large images'''
     
@@ -924,7 +1102,7 @@ def run_valid(framework='YOLT',
     
     # determine object labels and number of files
     #yolt_object_labels = [label_map_dict[ktmp] for ktmp in sorted(label_map_dict.keys())]
-    #n_files = len(valid_files_locs_list)  #file_len(valid_splitims_locs_file)
+    #n_files = len(test_files_locs_list)  #file_len(test_splitims_locs_file)
 
     t0 = time.time()
     # run command
@@ -933,25 +1111,26 @@ def run_valid(framework='YOLT',
     cmd_time_str = '"\nLength of time to run command: ' +  infer_cmd \
                     + ' for ' + str(n_files) + ' cutouts: ' \
                     + str(t1 - t0) + ' seconds\n"'
-    print (cmd_time_str )
+    print (cmd_time_str[1:-1])
     os.system('echo ' + cmd_time_str + ' >> ' + log_file)
 
 
     # run second classsifier?....
 
-    if framework.upper() != 'YOLT':
+    if framework.upper() not in ['YOLT2', 'YOLT3']:
         
         # if we ran inference with a tfrecord, we must now parse that into
         #   a dataframe
-        if len(valid_tfrecord_out) > 0:
-            df_init = parse_tfrecord.tf_to_df(valid_tfrecord_out, 
+        if len(test_tfrecord_out) > 0:
+            df_init = parse_tfrecord.tf_to_df(test_tfrecord_out, 
                 max_iter=500000, 
                 label_map_dict=label_map_dict, 
                 tf_type='test',
                 output_columns = ['Loc_Tmp', u'Prob', u'Xmin', u'Ymin', u'Xmax', u'Ymax', u'Category'],
                 replace_paths=())
             # use numeric categories
-            label_map_dict_rev = {v: k for k,v in label_map_dict.iteritems()}
+            label_map_dict_rev = {v: k for k,v in label_map_dict.items()}
+            #label_map_dict_rev = {v: k for k,v in label_map_dict.iteritems()}
             df_init['Category'] = [label_map_dict_rev[vtmp] for vtmp in df_init['Category'].values]
             # save to file            
             df_init.to_csv(val_df_path_init)
@@ -976,7 +1155,7 @@ def run_valid(framework='YOLT',
 
         # clean out bad categories
         df_init['Category'] = df_init['Category'].values.astype(int)
-        good_cats = label_map_dict.keys()
+        good_cats = list(label_map_dict.keys())
         print ("Allowed categories:", good_cats)
         #print ("df_init0['Category'] > np.max(good_cats)", df_init['Category'] > np.max(good_cats))
         #print ("df_init0[df_init0['Category'] > np.max(good_cats)]", df_init[df_init['Category'] > np.max(good_cats)])
@@ -1001,35 +1180,51 @@ def run_valid(framework='YOLT',
 
         # augment dataframe columns
         df_tot = post_process.augment_df(df_init, 
-                   valid_testims_dir_tot=valid_testims_dir_tot,
+                   testims_dir_tot=testims_dir_tot,
                    slice_sizes=slice_sizes,
-                   valid_slice_sep=valid_slice_sep,
-                   edge_buffer_valid=edge_buffer_valid,
+                   test_slice_sep=test_slice_sep,
+                   edge_buffer_test=edge_buffer_test,
                    max_edge_aspect_ratio=max_edge_aspect_ratio,
-                   valid_box_rescale_frac=valid_box_rescale_frac,
+                   test_box_rescale_frac=test_box_rescale_frac,
                    rotate_boxes=rotate_boxes,
                    verbose=True)
 
     else:
         # post-process
-        #df_tot = post_process_yolt_valid_create_df(args)
-        df_tot = post_process.post_process_yolt_valid_create_df(yolt_valid_classes_files, 
+        #df_tot = post_process_yolt_test_create_df(args)
+        df_tot = post_process.post_process_yolt_test_create_df(yolt_test_classes_files, 
                    log_file, 
-                   valid_testims_dir_tot=valid_testims_dir_tot,
+                   testims_dir_tot=testims_dir_tot,
                    slice_sizes=slice_sizes,
-                   valid_slice_sep=valid_slice_sep,
-                   edge_buffer_valid=edge_buffer_valid,
+                   test_slice_sep=test_slice_sep,
+                   edge_buffer_test=edge_buffer_test,
                    max_edge_aspect_ratio=max_edge_aspect_ratio,
-                   valid_box_rescale_frac=valid_box_rescale_frac,
+                   test_box_rescale_frac=test_box_rescale_frac,
                    rotate_boxes=rotate_boxes)
     
     ###########################################
     # plot
     
+    # add geo coords to eall boxes?
+    if test_add_geo_coords:
+        ###########################################
+        # !!!!! Skip for now (for demo...)
+        json = None
+        ###########################################    
+        #df_tot, json = add_geo_coords.add_geo_coords_to_df(df_tot, create_geojson=False, 
+        #                 inProj_str='epsg:4326', outProj_str='epsg:3857',
+        #                 verbose=verbose)
+    else:
+        json = None
+    
     # save to csv
     #df_tot.to_csv(val_df_path_aug, index=False) 
     
-    return df_tot
+    return df_tot, json
+
+
+
+
 
     #post_proccess_make_plots(args, df_tot, verbose=True)
         
@@ -1047,23 +1242,23 @@ def run_valid(framework='YOLT',
 #                           plot=True,
 #                           verbose=False)
 #    
-#    # remove or zip valid_split_dirs to save space
-#    for valid_split_dir_tmp in valid_split_dir_list:
-#        if os.path.exists(valid_split_dir_tmp):
+#    # remove or zip test_split_dirs to save space
+#    for test_split_dir_tmp in test_split_dir_list:
+#        if os.path.exists(test_split_dir_tmp):
 #            # compress image chip dirs if desired
-#            if keep_valid_slices.upper() == 'TRUE':
+#            if keep_test_slices.upper() == 'TRUE':
 #                print ("Compressing image chips...")
-#                shutil.make_archive(valid_split_dir_tmp, 'zip', 
-#                                    valid_split_dir_tmp)    
+#                shutil.make_archive(test_split_dir_tmp, 'zip', 
+#                                    test_split_dir_tmp)    
 #            # remove unzipped folder
-#            print ("Removing valid_split_dir_tmp:", valid_split_dir_tmp)
-#            # make sure that valid_split_dir_tmp hasn't somehow been shortened
+#            print ("Removing test_split_dir_tmp:", test_split_dir_tmp)
+#            # make sure that test_split_dir_tmp hasn't somehow been shortened
 #            #  (don't want to remove "/")
-#            if len(valid_split_dir_tmp) < len(results_dir):
-#                print ("valid_split_dir_tmp too short!!!!:", valid_split_dir_tmp)
+#            if len(test_split_dir_tmp) < len(results_dir):
+#                print ("test_split_dir_tmp too short!!!!:", test_split_dir_tmp)
 #                return
 #            else:
-#                shutil.rmtree(valid_split_dir_tmp, ignore_errors=True)
+#                shutil.rmtree(test_split_dir_tmp, ignore_errors=True)
 #                
 #    ## zip image files
 #    #print "Zipping image files..."
@@ -1076,12 +1271,12 @@ def run_valid(framework='YOLT',
 #    return refine_dic
 
 ################################################################################
-#def refine_valid(df_tot, valid_split_dir_list=[],
+#def refine_test(df_tot, test_split_dir_list=[],
 #                 groupby='Image_Path', label_map_dict='', 
 #                 sliced=True, results_dir='',
 #                 plot_thresh=0.33, nms_overlap_thresh=0.5, show_labels=False,
 #                 alpha_scaling=False, plot_line_thickness=1, make_plots=True,
-#                 keep_valid_slices=False,
+#                 keep_test_slices=False,
 #                 verbose=False):
 #
 #    # refine and plot
@@ -1098,24 +1293,24 @@ def run_valid(framework='YOLT',
 #                           plot=make_plots,
 #                           verbose=verbose)
 #                 
-#    # remove or zip valid_split_dirs to save space
-#    if len(valid_split_dir_list) > 0:
-#        for valid_split_dir_tmp in valid_split_dir_list:
-#            if os.path.exists(valid_split_dir_tmp):
+#    # remove or zip test_split_dirs to save space
+#    if len(test_split_dir_list) > 0:
+#        for test_split_dir_tmp in test_split_dir_list:
+#            if os.path.exists(test_split_dir_tmp):
 #                # compress image chip dirs if desired
-#                if keep_valid_slices:
+#                if keep_test_slices:
 #                    print ("Compressing image chips...")
-#                    shutil.make_archive(valid_split_dir_tmp, 'zip', 
-#                                        valid_split_dir_tmp)    
+#                    shutil.make_archive(test_split_dir_tmp, 'zip', 
+#                                        test_split_dir_tmp)    
 #                # remove unzipped folder
-#                print ("Removing valid_split_dir_tmp:", valid_split_dir_tmp)
-#                # make sure that valid_split_dir_tmp hasn't somehow been shortened
+#                print ("Removing test_split_dir_tmp:", test_split_dir_tmp)
+#                # make sure that test_split_dir_tmp hasn't somehow been shortened
 #                #  (don't want to remove "/")
-#                if len(valid_split_dir_tmp) < len(results_dir):
-#                    print ("valid_split_dir_tmp too short!!!!:", valid_split_dir_tmp)
+#                if len(test_split_dir_tmp) < len(results_dir):
+#                    print ("test_split_dir_tmp too short!!!!:", test_split_dir_tmp)
 #                    return
 #                else:
-#                    shutil.rmtree(valid_split_dir_tmp, ignore_errors=True)
+#                    shutil.rmtree(test_split_dir_tmp, ignore_errors=True)
 #                    
 #    ## zip image files
 #    #print "Zipping image files..."
@@ -1135,17 +1330,18 @@ def execute(args):
     print ("\nSIMRDWN now...\n")
     os.chdir(args.simrdwn_dir)
     #t0 = time.time()
-        
+    
     # make dirs
     os.mkdir(args.results_dir)
     os.mkdir(args.log_dir)
-
-    # create log file, init to the contents in this file
+    
+    # create log file
     print ("Date string:", args.date_string)
     os.system('echo ' + str(args.date_string) + ' > ' + args.log_file)      
-    os.system('cat ' + args.this_file + ' >> ' + args.log_file)      
+    # init to the contents in this file?
+    #os.system('cat ' + args.this_file + ' >> ' + args.log_file)      
     args_str = '"\nArgs: ' +  str(args) + '\n"'
-    print (args_str)  
+    print (args_str[1:-1])  
     os.system('echo ' + args_str + ' >> ' + args.log_file)
 
     # copy this file (yolt_run.py) as well as config, plot file to results_dir
@@ -1154,21 +1350,21 @@ def execute(args):
     #shutil.copy2(args.tf_plot_file, args.log_dir)
     print ("log_dir:", args.log_dir)
 
-    print ("\nlabel_map_dict:", args.label_map_dict)
+    #print ("\nlabel_map_dict:", args.label_map_dict)
     print ("\nlabel_map_dict_tot:", args.label_map_dict_tot)
     #print ("object_labels:", args.object_labels)
-    print ("\nyolt_object_labels:", args.yolt_object_labels)
+    print ("yolt_object_labels:", args.yolt_object_labels)
     print ("yolt_classnum:", args.yolt_classnum)
     
     # save labels to log_dir
     #pickle.dump(args.object_labels, open(args.log_dir \
     #                                    + 'labels_list.pkl', 'wb'), protocol=2)
-    with open (args.labels_log_file, "wb") as fp:
+    with open (args.labels_log_file, "w") as fp:
         for ob in args.yolt_object_labels:
-           fp.write(ob+"\n")
+           fp.write(str(ob) + "\n")
 
     # set YOLT values, if desired
-    if args.framework.upper() == 'YOLT':
+    if (args.framework.upper() == 'YOLT2') or (args.framework.upper() == 'YOLT3'):
        
         # copy files to log dir
         shutil.copy2(args.yolt_plot_file, args.log_dir)
@@ -1178,18 +1374,20 @@ def execute(args):
         print ("yolt_cfg_file:", args.yolt_cfg_file_in)
         if args.mode.upper() in ['TRAIN', 'COMPILE']:
             print ("Updating yolt params in files...")
-            replace_yolt_vals_train_compile(yolt_dir=args.yolt_dir, 
+            replace_yolt_vals_train_compile(framework=args.framework,
+                              yolt_dir=args.yolt_dir, 
                               mode=args.mode, 
                               yolt_cfg_file_tot=args.yolt_cfg_file_tot,
                               yolt_final_output=args.yolt_final_output,
                               yolt_classnum=args.yolt_classnum,
                               nbands=args.nbands,
+                              yolov3_filters=args.yolov3_filters,
                               max_batches=args.max_batches,
                               batch_size=args.batch_size,
                               subdivisions=args.subdivisions,
                               boxes_per_grid=args.boxes_per_grid,
-                              yolt_input_width=args.yolt_input_width,
-                              yolt_input_height=args.yolt_input_height,
+                              train_input_width=args.train_input_width,
+                              train_input_height=args.train_input_height,
                               use_GPU=args.use_GPU,
                               use_opencv=args.use_opencv,
                               use_CUDNN=args.use_CUDNN)
@@ -1206,7 +1404,7 @@ def execute(args):
             return
      
         # set yolt command  
-        yolt_cmd = yolt_command(yolt_cfg_file_tot=args.yolt_cfg_file_tot,
+        yolt_cmd = yolt_command(args.framework, yolt_cfg_file_tot=args.yolt_cfg_file_tot,
                  weight_file_tot=args.weight_file_tot,
                  results_dir=args.results_dir,
                  log_file=args.log_file,
@@ -1218,9 +1416,9 @@ def execute(args):
                  gpu=args.gpu,
                  single_gpu_machine=args.single_gpu_machine,
                  yolt_train_images_list_file_tot=args.yolt_train_images_list_file_tot,
-                 valid_splitims_locs_file=args.valid_splitims_locs_file,
+                 test_splitims_locs_file=args.test_splitims_locs_file,
                  yolt_nms_thresh=args.yolt_nms_thresh,
-                 min_retain_prob = args.min_retain_prob)
+                 min_retain_prob=args.min_retain_prob)
         
         if args.mode.upper() == 'TRAIN':
             print ("yolt_train_cmd:", yolt_cmd)
@@ -1228,11 +1426,11 @@ def execute(args):
             train_cmd1 = yolt_cmd
             #train_cmd2 = ''
         
-        # set second validation command
-        elif args.mode.upper() == 'VALID':
-            valid_cmd_tot = yolt_cmd
+        # set second test command
+        elif args.mode.upper() == 'TEST':
+            test_cmd_tot = yolt_cmd
         if len(args.label_map_path2) > 0:
-            valid_cmd_tot2 = yolt_command(yolt_cfg_file_tot=args.yolt_cfg_file_tot2,
+            test_cmd_tot2 = yolt_command(args.framework, yolt_cfg_file_tot=args.yolt_cfg_file_tot2,
                  weight_file_tot=args.weight_file_tot2,
                  results_dir=args.results_dir,
                  log_file=args.log_file,
@@ -1242,12 +1440,12 @@ def execute(args):
                  nbands=args.nbands,
                  gpu=args.gpu,
                  single_gpu_machine=args.single_gpu_machine,
-                 valid_splitims_locs_file=args.valid_splitims_locs_file2,
+                 test_splitims_locs_file=args.test_splitims_locs_file2,
                  yolt_nms_thresh=args.yolt_nms_thresh,
-                 min_retain_prob = args.min_retain_prob)
+                 min_retain_prob=args.min_retain_prob)
 
         else:
-            valid_cmd_tot2 = ''
+            test_cmd_tot2 = ''
         
     # set tensor flow object detection API values
     else:
@@ -1258,15 +1456,20 @@ def execute(args):
             # copy plot file to output dir
             shutil.copy2(args.tf_plot_file, args.log_dir)
 
+
             print ("Updating tf_config...")
             update_tf_train_config(args.tf_cfg_train_file, args.tf_cfg_train_file_out,
                              label_map_path=args.label_map_path, 
                              train_tf_record=args.train_tf_record, 
                              train_val_tf_record=args.train_val_tf_record, 
+                             train_input_width=args.train_input_width, 
+                             train_input_height=args.train_input_height,
                              batch_size=args.batch_size,
                              num_steps=args.max_batches)
             # define train command
-            cmd_train_tf = tf_train_cmd(args.tf_cfg_train_file_out, args.results_dir)
+            cmd_train_tf = tf_train_cmd(args.tf_cfg_train_file_out, 
+                                        args.results_dir,
+                                        args.max_batches)
                     #, args.log_file)
                     
             # export command
@@ -1285,8 +1488,10 @@ def execute(args):
 #                                + cmd_export_tf + ' >> ' + args.log_file \
 #                                + "'" + ' & tail -f ' + args.log_file                    
 
+            #train_cmd1 = cmd_train_tf
             train_cmd1 = 'nohup ' + cmd_train_tf + ' >> ' + args.log_file \
                             + ' & tail -f ' + args.log_file + ' &'
+
             #train_cmd2 = 'nohup ' +  cmd_export_tf + ' >> ' + args.log_file \
             #                + ' & tail -f ' + args.log_file #+ ' &'
 
@@ -1294,14 +1499,14 @@ def execute(args):
             #train_cmd1 = cmd_train_tf 
             #train_cmd2 = cmd_export_tf 
     
-        # Validate
+        # testate
         else:
 
-            # define inference (validation) command   (output to csv)
-            valid_cmd_tot = tf_infer_cmd_dual(inference_graph_path=args.inference_graph_path_tot, 
-                          input_file_list=args.valid_splitims_locs_file,
-                          in_tfrecord_path=args.valid_presliced_tfrecord_tot, 
-                          out_tfrecord_path=args.valid_tfrecord_out,
+            # define inference (test) command   (output to csv)
+            test_cmd_tot = tf_infer_cmd_dual(inference_graph_path=args.inference_graph_path_tot, 
+                          input_file_list=args.test_splitims_locs_file,
+                          in_tfrecord_path=args.test_presliced_tfrecord_tot, 
+                          out_tfrecord_path=args.test_tfrecord_out,
                           output_csv_path=args.val_df_path_init,
                           min_thresh=args.min_retain_prob,
                           BGR2RGB=args.BGR2RGB,
@@ -1323,11 +1528,11 @@ def execute(args):
                     cmd_time_str = '"Length of time to run command: ' \
                                     +  cmd_tmp + ' ' \
                                     + str(t2 - t1) + ' seconds\n"'
-                    print (cmd_time_str)  
+                    print (cmd_time_str[1:-1])  
                     os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
                 # set inference command
-                valid_cmd_tot2 = tf_infer_cmd_dual(inference_graph_path=args.inference_graph_path_tot2, 
-                          input_file_list=args.valid_splitims_locs_file2,
+                test_cmd_tot2 = tf_infer_cmd_dual(inference_graph_path=args.inference_graph_path_tot2, 
+                          input_file_list=args.test_splitims_locs_file2,
                           output_csv_path=args.val_df_path_init2,
                           min_thresh=args.min_retain_prob,
                           GPU=args.gpu,
@@ -1335,7 +1540,7 @@ def execute(args):
                           use_tfrecords=args.use_tfrecords,
                           infer_src_path=path_simrdwn_core)        
             else:
-                valid_cmd_tot2 = ''
+                test_cmd_tot2 = ''
                 
                 
     ### Execute
@@ -1343,21 +1548,32 @@ def execute(args):
         
         t1 = time.time()
         print ("Running", train_cmd1, "...\n\n")
+
+#        from subprocess import Popen, PIPE, STDOUT
+#        p = Popen(train_cmd1, stdout = PIPE, stderr = STDOUT, shell = True)
+#        while True:
+#            line = p.stdout.readline()
+#            if not line: break
+#            #print (line.replace('\n', ''))
+
         os.system(train_cmd1)
         #utils.run_cmd(train_cmd1)
         t2 = time.time()
         cmd_time_str = '"Length of time to run command: ' \
                         +  train_cmd1 + ' ' \
                         + str(t2 - t1) + ' seconds\n"'
-        print (cmd_time_str)  
+        print (cmd_time_str[1:-1])  
         os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
     
     
-        # export trained model, if using tf object detection api
-        if 2 < 1 and (args.framework.upper() != 'YOLT'):
+        # export trained model, if using tf object detection api?
+        if 2 < 1 and (args.framework.upper() not in ['YOLT2', 'YOLT3']):
             cmd_export_tf = tf_export_model_cmd(args.tf_cfg_train_file_out, 
-                                             args.results_dir, 
-                                             args.tf_model_output_directory)
+                                                tf_cfg_train_file=args.tf_cfg_train_file,  
+                                                model_output_root='frozen_model')
+                                             #args.results_dir, 
+                                             #args.tf_model_output_directory,
+                                             #tf_cfg_train_file=args.tf_cfg_train_file)
             train_cmd2 = cmd_export_tf
 
             t1 = time.time()
@@ -1368,7 +1584,7 @@ def execute(args):
             cmd_time_str = '"Length of time to run command: ' \
                             +  train_cmd2 + ' ' \
                             + str(t2 - t1) + ' seconds\n"'
-            print (cmd_time_str)  
+            print (cmd_time_str[1:-1])  
             os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
 
         #t1 = time.time()
@@ -1383,49 +1599,49 @@ def execute(args):
 
 
 
-    # need to split file for valid first, then run command
-    elif args.mode.upper() == 'VALID':
+    # need to split file for test first, then run command
+    elif args.mode.upper() == 'TEST':
         
         t3 = time.time()
         # load presliced data, if desired
-        if len(args.valid_presliced_list) > 0:
-            print ("Loading args.valid_presliced_list:", args.valid_presliced_list_tot)
-            ftmp = open(args.valid_presliced_list_tot, 'r')
-            valid_files_locs_list = [line.strip() for line in ftmp.readlines()]
+        if len(args.test_presliced_list) > 0:
+            print ("Loading args.test_presliced_list:", args.test_presliced_list_tot)
+            ftmp = open(args.test_presliced_list_tot, 'r')
+            test_files_locs_list = [line.strip() for line in ftmp.readlines()]
             ftmp.close()
-            valid_split_dir_list = []
-            print ("len valid_files_locs_list:", len(valid_files_locs_list))
-        elif len(args.valid_presliced_tfrecord_part) > 0:
-            print ("Using", args.valid_presliced_tfrecord_part)
-            valid_split_dir_list = []
-        # split large validion files
+            test_split_dir_list = []
+            print ("len test_files_locs_list:", len(test_files_locs_list))
+        elif len(args.test_presliced_tfrecord_part) > 0:
+            print ("Using", args.test_presliced_tfrecord_part)
+            test_split_dir_list = []
+        # split large test files
         else:
-            print ("Prepping validation files")
-            valid_files_locs_list, valid_split_dir_list =\
-                    prep_valid_files(args.results_dir, args.log_file, 
-                             args.valid_ims_list, 
-                             args.valid_testims_dir_tot, 
-                             args.valid_splitims_locs_file,
+            print ("Prepping test files")
+            test_files_locs_list, test_split_dir_list =\
+                    prep_test_files(args.results_dir, args.log_file, 
+                             args.test_ims_list, 
+                             args.testims_dir_tot, 
+                             args.test_splitims_locs_file,
                              slice_sizes=args.slice_sizes,
                              slice_overlap=args.slice_overlap,
-                             valid_slice_sep=args.valid_slice_sep,
+                             test_slice_sep=args.test_slice_sep,
                              zero_frac_thresh=args.zero_frac_thresh,
                              )
             # return if only interested in prepping
-            if bool(args.valid_prep_only):
+            if bool(args.test_prep_only):
                 print ("Convert to tfrecords...")
-                TF_RecordPath = os.path.join(args.results_dir, 'valid_splitims.tfrecord')
-                preprocess_tfrecords.yolt_imlist_to_tf(args.valid_splitims_locs_file, 
+                TF_RecordPath = os.path.join(args.results_dir, 'test_splitims.tfrecord')
+                preprocess_tfrecords.yolt_imlist_to_tf(args.test_splitims_locs_file, 
                                            args.label_map_dict, TF_RecordPath,
                                            TF_PathVal='', val_frac=0.0, 
                                            convert_dict={}, verbose=False)
 
-                print ("Done prepping valid files, ending")
+                print ("Done prepping test files, ending")
                 return
 
 
         # check if trained model exists, if not, create it.
-        if (args.framework.upper() != 'YOLT') and \
+        if (args.framework.upper() not in ['YOLT2', 'YOLT3']) and \
             (not (os.path.exists(args.inference_graph_path_tot)) or \
                     (args.overwrite_inference_graph != 0)):
             print ("Creating args.inference_graph_path_tot:", 
@@ -1439,7 +1655,9 @@ def execute(args):
                 shutil.rmtree(saved_dir, ignore_errors=True)
 
             trained_dir_tmp = os.path.dirname(os.path.dirname(args.inference_graph_path_tot))
-            cmd_tmp = tf_export_model_cmd(trained_dir=trained_dir_tmp)
+            cmd_tmp = tf_export_model_cmd(trained_dir=trained_dir_tmp,
+                                            tf_cfg_train_file=args.tf_cfg_train_file)
+
             #cmd_tmp = 'python  ' \
             #            + args.src_dir + '/export_model.py ' \
             #            + '--results_dir=' + inference_graph_path_tmp
@@ -1450,63 +1668,64 @@ def execute(args):
             cmd_time_str = '"Length of time to run command: ' \
                             +  cmd_tmp + ' ' \
                             + str(t2 - t1) + ' seconds\n"'
-            print (cmd_time_str)  
+            print (cmd_time_str[1:-1])  
             os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
 
 
 
 
-        df_tot = run_valid(infer_cmd=valid_cmd_tot, 
+        df_tot, json = run_test(infer_cmd=test_cmd_tot, 
               framework=args.framework, 
               results_dir=args.results_dir, 
               log_file=args.log_file,
-              #valid_files_locs_list=valid_files_locs_list,
-              #valid_presliced_tfrecord_tot=args.valid_presliced_tfrecord_tot,
-              valid_tfrecord_out = args.valid_tfrecord_out,
+              #test_files_locs_list=test_files_locs_list,
+              #test_presliced_tfrecord_tot=args.test_presliced_tfrecord_tot,
+              test_tfrecord_out = args.test_tfrecord_out,
               slice_sizes=args.slice_sizes,
-              valid_testims_dir_tot=args.valid_testims_dir_tot,
-              yolt_valid_classes_files=args.yolt_valid_classes_files,
+              testims_dir_tot=args.testims_dir_tot,
+              yolt_test_classes_files=args.yolt_test_classes_files,
               label_map_dict=args.label_map_dict,
               val_df_path_init=args.val_df_path_init,
               #val_df_path_aug=args.val_df_path_aug,
               min_retain_prob=args.min_retain_prob,
-              valid_slice_sep=args.valid_slice_sep,
-              edge_buffer_valid=args.edge_buffer_valid,
+              test_slice_sep=args.test_slice_sep,
+              edge_buffer_test=args.edge_buffer_test,
               max_edge_aspect_ratio=args.max_edge_aspect_ratio,
-              valid_box_rescale_frac=args.valid_box_rescale_frac,
-              rotate_boxes=args.rotate_boxes)
+              test_box_rescale_frac=args.test_box_rescale_frac,
+              rotate_boxes=args.rotate_boxes,
+              test_add_geo_coords=args.test_add_geo_coords)
         
         # save to csv
         df_tot.to_csv(args.val_df_path_aug, index=False) 
         # get number of files
         n_files = len(np.unique(df_tot['Loc_Tmp'].values))
-        #n_files = str(len(valid_files_locs_list)
+        #n_files = str(len(test_files_locs_list)
         t4 = time.time()
-        cmd_time_str = '"Length of time to run valid for ' \
+        cmd_time_str = '"Length of time to run test for ' \
                         + str(n_files) + ' files = ' \
                         + str(t4 - t3) + ' seconds\n"'
-        print (cmd_time_str)  
+        print (cmd_time_str[1:-1])  
         os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
         
               
-#        refine_dic = run_valid(args.framework, args.results_dir, args.log_file, 
-#              valid_files_locs_list, valid_split_dir_list,
+#        refine_dic = run_test(args.framework, args.results_dir, args.log_file, 
+#              test_files_locs_list, test_split_dir_list,
 #              infer_cmd_tf=infer_cmd_tf, 
 #              yolt_cmd=yolt_command,
-#              valid_testims_dir_tot=args.valid_testims_dir_tot,
-#              yolt_valid_classes_files=args.yolt_valid_classes_files,
+#              testims_dir_tot=args.testims_dir_tot,
+#              yolt_test_classes_files=args.yolt_test_classes_files,
 #              val_df_path_init=args.val_df_path_init,
 #              val_df_path_aug=args.val_df_path_aug,
 #              slice_sizes=args.slice_sizes,
-#              valid_slice_sep=args.valid_slice_sep,
+#              test_slice_sep=args.test_slice_sep,
 #              zero_frac_thresh=args.zero_frac_thresh,
-#              edge_buffer_valid=args.edge_buffer_valid,
+#              edge_buffer_test=args.edge_buffer_test,
 #              max_edge_aspect_ratio=args.max_edge_aspect_ratio,
-#              valid_box_rescale_frac=args.valid_box_rescale_frac,
+#              test_box_rescale_frac=args.test_box_rescale_frac,
 #              rotate_boxes=args.rotate_boxes,
 #              plot_thresh=args.plot_thresh[0],
 #              nms_overlap_thresh=args.nms_overlap_thresh,
-#              keep_valid_slices=args.keep_valid_slices,
+#              keep_test_slices=args.keep_test_slices,
 #              show_labels=bool(args.show_labels),
 #              alpha_scaling=bool(args.alpha_scaling),
 #              plot_line_thickness=args.plot_line_thickness
@@ -1517,42 +1736,44 @@ def execute(args):
         if len(args.weight_file2) > 0:
             
             t5 = time.time()
-            # split large validion files
-            print ("Prepping validation files")
-            valid_files_locs_list2, valid_split_dir_list2 =\
-                    prep_valid_files(args.results_dir, args.log_file, 
-                             args.valid_ims_list, 
-                             args.valid_testims_dir_tot, 
-                             args.valid_splitims_locs_file2,
+            # split large testion files
+            print ("Prepping test files")
+            test_files_locs_list2, test_split_dir_list2 =\
+                    prep_test_files(args.results_dir, args.log_file, 
+                             args.test_ims_list, 
+                             args.testims_dir_tot, 
+                             args.test_splitims_locs_file2,
                              slice_sizes=args.slice_sizes2,
                              slice_overlap=args.slice_overlap,
-                             valid_slice_sep=args.valid_slice_sep,
+                             test_slice_sep=args.test_slice_sep,
                              zero_frac_thresh=args.zero_frac_thresh,
                              )
     
-            df_tot2 = run_valid(infer_cmd=valid_cmd_tot2, 
+            df_tot2 = run_test(infer_cmd=test_cmd_tot2, 
                   framework=args.framework, 
                   results_dir=args.results_dir, 
                   log_file=args.log_file,
-                  valid_files_locs_list=valid_files_locs_list2,
+                  test_files_locs_list=test_files_locs_list2,
                   slice_sizes=args.slice_sizes,
-                  valid_testims_dir_tot=args.valid_testims_dir_tot2,
-                  yolt_valid_classes_files=args.yolt_valid_classes_files2,
+                  testims_dir_tot=args.testims_dir_tot2,
+                  yolt_test_classes_files=args.yolt_test_classes_files2,
                   label_map_dict=args.label_map_dict2,
                   val_df_path_init=args.val_df_path_init2,
                   #val_df_path_aug=args.val_df_path_aug2,
-                  valid_slice_sep=args.valid_slice_sep,
-                  edge_buffer_valid=args.edge_buffer_valid,
+                  test_slice_sep=args.test_slice_sep,
+                  edge_buffer_test=args.edge_buffer_test,
                   max_edge_aspect_ratio=args.max_edge_aspect_ratio,
-                  valid_box_rescale_frac=args.valid_box_rescale_frac,
-                  rotate_boxes=args.rotate_boxes)
+                  test_box_rescale_frac=args.test_box_rescale_frac,
+                  rotate_boxes=args.rotate_boxes,
+                  test_add_geo_coords=args.test_add_geo_coords)
+
             
             # save to csv
             df_tot2.to_csv(args.val_df_path_aug2, index=False) 
             t6 = time.time()
-            cmd_time_str = '"Length of time to run valid' + ' ' \
+            cmd_time_str = '"Length of time to run test' + ' ' \
                             + str(t6 - t5) + ' seconds\n"'
-            print (cmd_time_str)  
+            print (cmd_time_str[1:-1])  
             os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
             
             #Update category numbers of df_tot2 so that they aren't the same
@@ -1560,8 +1781,8 @@ def execute(args):
             
             #Combine df_tot and df_tot2
             df_tot = pd.concat([df_tot, df_tot2])
-            valid_split_dir_list = valid_split_dir_list \
-                                        + valid_split_dir_list2
+            test_split_dir_list = test_split_dir_list \
+                                        + test_split_dir_list2
             
             #Create new label_map_dict with all categories (done in init_args)
             
@@ -1575,11 +1796,11 @@ def execute(args):
             sliced = True
         else:
             sliced = False
-        print ("validation data sliced?", sliced)
+        print ("test data sliced?", sliced)
         
 #        # refine 
-#        df_refine = refine_valid(df_tot, 
-#                                  valid_split_dir_list=valid_split_dir_list,
+#        df_refine = refine_test(df_tot, 
+#                                  test_split_dir_list=test_split_dir_list,
 #                                  groupby='Image_Path', 
 #                                  label_map_dict=args.label_map_dict_tot, 
 #                                  sliced=sliced, 
@@ -1589,10 +1810,10 @@ def execute(args):
 #                                  show_labels=False,
 #                                  alpha_scaling=False, 
 #                                  plot_line_thickness=1, 
-#                                  make_plots=args.valid_make_pngs,
-#                                  keep_valid_slices=args.keep_valid_slices,
+#                                  make_plots=args.test_make_pngs,
+#                                  keep_test_slices=args.keep_test_slices,
 #                                  verbose=False)                  
-#        cmd_time_str = '"Length of time to run refine_valid()' + ' ' \
+#        cmd_time_str = '"Length of time to run refine_test()' + ' ' \
 #                        + str(time.time() - t8) + ' seconds\n"'
 #        print (cmd_time_str)  
 #        os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
@@ -1616,16 +1837,24 @@ def execute(args):
                  plot_thresh=plot_thresh_tmp, 
                  verbose=False)
             # make some output plots, if desired
-            if args.n_valid_output_plots > 0:
+            if len(args.building_csv_file) > 0:
+                building_csv_file_tmp = args.building_csv_file.split('.')[0] \
+                    + '_plot_thresh_' + str(plot_thresh_tmp).replace('.', 'p') \
+                    + '.csv'
+            else:
+                building_csv_file_tmp = ''
+            if args.n_test_output_plots > 0:
                 post_process.plot_refined_df(df_refine, groupby=groupby, 
                         label_map_dict=args.label_map_dict_tot, 
                         outdir=args.results_dir, 
                         plot_thresh=plot_thresh_tmp, 
                         show_labels=bool(args.show_labels), 
                         alpha_scaling=bool(args.alpha_scaling), 
-                        plot_line_thickness=2,
+                        plot_line_thickness=args.plot_line_thickness,
                         print_iter=5,
-                        n_plots=args.n_valid_output_plots,
+                        n_plots=args.n_test_output_plots,
+                        building_csv_file=building_csv_file_tmp,
+                        shuffle_ims=bool(args.shuffle_val_output_plot_ims),
                         verbose=False)
                         
 #            # refine and plot
@@ -1639,9 +1868,17 @@ def execute(args):
 #                           show_labels=False, 
 #                           alpha_scaling=False,
 #                           plot_line_thickness=1,
-#                           plot=args.valid_make_pngs,
+#                           plot=args.test_make_pngs,
 #                           verbose=False)
             
+            # geo coords?
+            if bool(args.test_add_geo_coords):
+                df_refine, json = add_geo_coords.add_geo_coords_to_df(
+                         df_refine, 
+                         create_geojson=bool(args.save_json), 
+                         inProj_str='epsg:32737', outProj_str='epsg:3857',
+                         #inProj_str='epsg:4326', outProj_str='epsg:3857',
+                         verbose=False)
             
             # save df_refine
             outpath_tmp = os.path.join(args.results_dir, 
@@ -1649,33 +1886,41 @@ def execute(args):
                                 '_thresh=' + str(plot_thresh_tmp) + '.csv')
             #df_refine.to_csv(args.val_prediction_df_refine_tot)
             df_refine.to_csv(outpath_tmp)
+            print ("Num objects at thresh:", plot_thresh_tmp, "=", 
+                   len(df_refine))
+            # save json
+            if bool(args.save_json):
+                output_json_path = os.path.join(args.results_dir, 
+                                args.val_prediction_df_refine_tot_root_part +
+                                '_thresh=' + str(plot_thresh_tmp) + '.GeoJSON')
+                json.to_file(output_json_path, driver="GeoJSON")
 
 
-        cmd_time_str = '"Length of time to run refine_valid()' + ' ' \
-                        + str(time.time() - t8) + ' seconds\n"'
-        print (cmd_time_str)  
+        cmd_time_str = '"Length of time to run refine_test()' + ' ' \
+                        + str(time.time() - t8) + ' seconds"'
+        print (cmd_time_str[1:-1])  
         os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
                          
-        # remove or zip valid_split_dirs to save space
-        if len(valid_split_dir_list) > 0:
-            for valid_split_dir_tmp in valid_split_dir_list:
-                if os.path.exists(valid_split_dir_tmp):
+        # remove or zip test_split_dirs to save space
+        if len(test_split_dir_list) > 0:
+            for test_split_dir_tmp in test_split_dir_list:
+                if os.path.exists(test_split_dir_tmp):
                     # compress image chip dirs if desired
-                    if args.keep_valid_slices:
+                    if args.keep_test_slices:
                         print ("Compressing image chips...")
-                        shutil.make_archive(valid_split_dir_tmp, 'zip', 
-                                            valid_split_dir_tmp)    
+                        shutil.make_archive(test_split_dir_tmp, 'zip', 
+                                            test_split_dir_tmp)    
                     # remove unzipped folder
-                    print ("Removing valid_split_dir_tmp:", valid_split_dir_tmp)
-                    # make sure that valid_split_dir_tmp hasn't somehow been shortened
+                    print ("Removing test_split_dir_tmp:", test_split_dir_tmp)
+                    # make sure that test_split_dir_tmp hasn't somehow been shortened
                     #  (don't want to remove "/")
-                    if len(valid_split_dir_tmp) < len(args.results_dir):
-                        print ("valid_split_dir_tmp too short!!!!:", valid_split_dir_tmp)
+                    if len(test_split_dir_tmp) < len(args.results_dir):
+                        print ("test_split_dir_tmp too short!!!!:", test_split_dir_tmp)
                         return
                     else:
                         print ("Removing image chips...")
 
-                        shutil.rmtree(valid_split_dir_tmp, ignore_errors=True)
+                        shutil.rmtree(test_split_dir_tmp, ignore_errors=True)
                     
  
 
@@ -1684,59 +1929,57 @@ def execute(args):
 #        if len(args.weight_file2) > 0:
 #            
 #            t3 = time.time()
-#            # split large validion files
-#            print ("Prepping validation files")
-#            valid_files_locs_list2, valid_split_dir_list2 =\
-#                    prep_valid_files(args.results_dir, args.log_file, 
-#                             args.valid_ims_list, 
-#                             args.valid_testims_dir_tot, 
-#                             args.valid_splitims_locs_file2,
+#            # split large testion files
+#            print ("Prepping test files")
+#            test_files_locs_list2, test_split_dir_list2 =\
+#                    prep_test_files(args.results_dir, args.log_file, 
+#                             args.test_ims_list, 
+#                             args.testims_dir_tot, 
+#                             args.test_splitims_locs_file2,
 #                             slice_sizes=args.slice_sizes2,
 #                             slice_overlap=args.slice_overlap,
-#                             valid_slice_sep=args.valid_slice_sep,
+#                             test_slice_sep=args.test_slice_sep,
 #                             zero_frac_thresh=args.zero_frac_thresh,
 #                             )
 #    
-#            refine_dic = run_valid(args.framework, args.results_dir, args.log_file, 
-#                  valid_files_locs_list2, valid_split_dir_list2,
+#            refine_dic = run_test(args.framework, args.results_dir, args.log_file, 
+#                  test_files_locs_list2, test_split_dir_list2,
 #                  infer_cmd_tf=infer_cmd_tf, 
 #                  yolt_cmd=yolt_command,
-#                  valid_testims_dir_tot=args.valid_testims_dir_tot,
-#                  yolt_valid_classes_files=args.yolt_valid_classes_files,
+#                  testims_dir_tot=args.testims_dir_tot,
+#                  yolt_test_classes_files=args.yolt_test_classes_files,
 #                  val_df_path_init=args.val_df_path_init,
 #                  val_df_path_aug=args.val_df_path_aug,
 #                  slice_sizes=args.slice_sizes,
-#                  valid_slice_sep=args.valid_slice_sep,
+#                  test_slice_sep=args.test_slice_sep,
 #                  zero_frac_thresh=args.zero_frac_thresh,
-#                  edge_buffer_valid=args.edge_buffer_valid,
+#                  edge_buffer_test=args.edge_buffer_test,
 #                  max_edge_aspect_ratio=args.max_edge_aspect_ratio,
-#                  valid_box_rescale_frac=args.valid_box_rescale_frac,
+#                  test_box_rescale_frac=args.test_box_rescale_frac,
 #                  rotate_boxes=args.rotate_boxes,
 #                  plot_thresh=args.plot_thresh[0],
 #                  nms_overlap_thresh=args.nms_overlap_thresh,
-#                  keep_valid_slices=args.keep_valid_slices,
+#                  keep_test_slices=args.keep_test_slices,
 #                  show_labels=bool(args.show_labels),
 #                  alpha_scaling=bool(args.alpha_scaling),
 #                  plot_line_thickness=args.plot_line_thickness
 #                  )
 #            # save refine_dic 
 #            pickle.dump(refine_dic, open(args.val_prediction_pkl, "wb"))
-#            cmd_time_str = '"Length of time to run valid' + ' ' \
+#            cmd_time_str = '"Length of time to run test' + ' ' \
 #                            + str(time.time() - t3) + ' seconds\n"'
 #            print (cmd_time_str)  
 #            os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
     
-
-        cmd_time_str = '"Length of time to run valid' + ' ' \
-                        + str(time.time() - t3) + ' seconds\n"'
-        print (cmd_time_str)  
-    
-    
-    os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
+        cmd_time_str = '"Total Length of time to run test' + ' ' \
+                            + str(time.time() - t3) + ' seconds\n"'
+        print (cmd_time_str[1:-1])  
+        os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
     
         
-    print ("\nNo honeymoon. This is business.")
-    
+    #print ("\nNo honeymoon. This is business.")
+    print ("\n\n\nWell, I'm glad we got that out of the way.\n\n\n\n")
+
     return
 
 
@@ -1747,10 +1990,10 @@ def main():
     parser = argparse.ArgumentParser()
     
     # general settings
-    parser.add_argument('--framework', type=str, default='yolt',
-                        help="object detection framework [yolt, ssd, faster_rcnn]")
+    parser.add_argument('--framework', type=str, default='yolt2',
+                        help="object detection framework [yolt2, 'yolt3', ssd, faster_rcnn]")
     parser.add_argument('--mode', type=str, default='test',
-                        help="[compile, test, train, valid]")
+                        help="[compile, test, train, test]")
     parser.add_argument('--gpu', type=int, default=0,
                         help="GPU number, set < 0 to turn off GPU support")
     parser.add_argument('--single_gpu_machine', type=int, default=0,
@@ -1761,13 +2004,19 @@ def main():
                         help="unique name of output")
     parser.add_argument('--label_map_path', type=str, 
                         default='',
-                        help="Object classes, /raid/local/src/simrdwn/data/class_labels_airplane_boat_car.pbtxt")
-    parser.add_argument('--weight_dir', type=str, default='/raid/local/src/simrdwn/yolt/input_weights',
+                        help="Object classes, /raid/local/src/simrdwn2/data/class_labels_airplane_boat_car.pbtxt")
+    parser.add_argument('--weight_dir', type=str, default='/raid/local/src/simrdwn2/yolt/input_weights',
                         help="Directory holding trained weights")
     parser.add_argument('--weight_file', type=str, default='yolo.weights',
                         help="Input weight file")
+    parser.add_argument('--append_date_string', type=int, default=1,
+                        help="Switch to append date to results filename")
+    
 
     # training settings
+    parser.add_argument('--train_data_dir', type=str, default='',
+                        help="folder holding training image names, if empty " \
+                            "simrdwn_dir/data/")
     parser.add_argument('--yolt_train_images_list_file', type=str, default='',
                         help="file holding training image names, should be in " \
                             "simrdwn_dir/data/")
@@ -1775,10 +2024,10 @@ def main():
                         help="Max number of training batches")    
     parser.add_argument('--batch_size', type=int, default=32,
                         help="Number of images per batch")
-    parser.add_argument('--yolt_input_width', type=int, default=416,
+    parser.add_argument('--train_input_width', type=int, default=416,
                         help="Size of image to input to YOLT [n-boxes * 32: " \
                         + "415, 544, 608, 896")
-    parser.add_argument('--yolt_input_height', type=int, default=416,
+    parser.add_argument('--train_input_height', type=int, default=416,
                         help="Size of image to input to YOLT")    
     # TF api specific settings
     parser.add_argument('--tf_cfg_train_file', type=str, default='',
@@ -1786,30 +2035,32 @@ def main():
     parser.add_argument('--train_tf_record', type=str, default='',
                         help="tfrecord for training")
     parser.add_argument('--train_val_tf_record', type=str, default='',
-                        help="tfrecord for validation during training")
+                        help="tfrecord for test during training")
     #parser.add_argument('--train_tf_imsize', type=int, default=416,
     #                    help="Input image size")
     # yolt specific
+    # REPLACED BY LABEL_MAP_PATH!!
     parser.add_argument('--yolt_object_labels_str', type=str, default='',
                         help="yolt labels str: car,boat,giraffe")    
                         
-    # valid settings
+    # test settings
     parser.add_argument('--train_model_path', type=str, default='',
                         help="Location of trained model")  
     parser.add_argument('--use_tfrecords', type=int, default=1,
-                        help="Switch to use tfrecords for infernece")  
-    parser.add_argument('--valid_presliced_tfrecord_part', type=str, default='',
+                        help="Switch to use tfrecords for inference")  
+    parser.add_argument('--test_presliced_tfrecord_part', type=str, default='',
                         help="Location of presliced training data tfrecord " \
-                        + " if empty us valid_presliced_list")  
-    parser.add_argument('--valid_presliced_list', type=str, default='',
+                        + " if empty us test_presliced_list")  
+    parser.add_argument('--test_presliced_list', type=str, default='',
                         help="Location of presliced training data list "  \
                         + " if empty, use tfrecord")  
-    parser.add_argument('--valid_testims_dir', type=str, default='',
-                        help="Location of validation images")  
+    parser.add_argument('--testims_dir', type=str, default='test_images',
+                        help="Location of test images (look within simrdwn_dir unless begins with /)")  
     parser.add_argument('--slice_sizes_str', type=str, default='416',
-                        help="Proposed pixel slice sizes for valid, will be split"\
-                           +" into array by commas (e.g.: '0.2,0.3' => [0.2,0.3])")
-    parser.add_argument('--edge_buffer_valid', type=int, default=-1000,
+                        help="Proposed pixel slice sizes for test, will be split"\
+                           +" into array by commas (e.g.: '0.2,0.3' => [0.2,0.3])"\
+                           +"(Set to < 0 to not slice")
+    parser.add_argument('--edge_buffer_test', type=int, default=-1000,
                         help="Buffer around slices to ignore boxes (helps with"\
                             +" truncated boxes and stitching) set <0 to turn off"\
                             +" if not slicing test ims")
@@ -1817,61 +2068,86 @@ def main():
                         help="Max aspect ratio of any item within the above "\
                             +" buffer")
     parser.add_argument('--slice_overlap', type=float, default=0.35,
-                        help="Overlap fraction for sliding window in valid")
+                        help="Overlap fraction for sliding window in test")
     parser.add_argument('--nms_overlap_thresh', type=float, default=0.5,
                         help="Overlap threshold for non-max-suppresion in python"\
                             +" (set to <0 to turn off)")
-    parser.add_argument('--valid_box_rescale_frac', type=float, default=1.0,
+    #parser.add_argument('--extra_pkl', type=str, default='',
+    #                    help="External pkl to load on plots")
+    parser.add_argument('--test_box_rescale_frac', type=float, default=1.0,
                         help="Defaults to 1, rescale output boxes if training"\
                             + " boxes are the wrong size")    
-    parser.add_argument('--valid_slice_sep', type=str, default='__',
-                        help="Character(s) to split validation image file names")
-    parser.add_argument('--val_df_root_init', type=str, default='valid_predictions_init.csv',
+    parser.add_argument('--test_slice_sep', type=str, default='__',
+                        help="Character(s) to split test image file names")
+    parser.add_argument('--val_df_root_init', type=str, default='test_predictions_init.csv',
                         help="Results in dataframe format")
-    parser.add_argument('--val_df_root_aug', type=str, default='valid_predictions_aug.csv',
+    parser.add_argument('--val_df_root_aug', type=str, default='test_predictions_aug.csv',
                         help="Results in dataframe format")
-    parser.add_argument('--valid_splitims_locs_file_root', type=str, default='valid_splitims_input_files.txt',
-                        help="Root of valid_splitims_locs_file")
-    parser.add_argument('--valid_prep_only', type=int, default=0,
+    parser.add_argument('--test_splitims_locs_file_root', type=str, default='test_splitims_input_files.txt',
+                        help="Root of test_splitims_locs_file")
+    parser.add_argument('--test_prep_only', type=int, default=0,
                         help="Switch to only prep files, not run anything")
     parser.add_argument('--BGR2RGB', type=int, default=0,
                         help="Switch to flip training files to RGB from cv2 BGR")      
     parser.add_argument('--overwrite_inference_graph', type=int, default=0,
                         help="Switch to always overwrite inference graph")      
     parser.add_argument('--min_retain_prob', type=float, default=0.025,
-                        help="minimum probability to retain for validation")      
+                        help="minimum probability to retain for test")      
+    parser.add_argument('--test_add_geo_coords', type=int, default=1,
+                        help="switch to add geo coords to test outputs")      
+    #parser.add_argument('--test_prediction_pkl_root', type=str, default='val_refine_preds.pkl',
+    #                    help="Root of test pickle")
+    #parser.add_argument('--test_tfrecord_root', type=str, default='test_input_files.tfrecord',
+    #                    help="Root of test_tfrecord")
+
+    # test, specific to object detection api
+    #parser.add_argument('--inference_graph_path', type=str, default='/raid/local/src/simrdwn2/outputs/ssd/output_inference_graph/frozen_inference_graph.pb',
+    #                    help="Location of inference graph for tensorflow " \
+    #                    + "object detection API")
+
+    #parser.add_argument('--infer_src_path', type=str, 
+    #                    default = '/raid/local/src/simrdwn2/src/infer_detections.py',
+    #                    help="Path to inference script")
     
-    # valid, specific to YOLT
+    # test, specific to YOLT
     parser.add_argument('--yolt_nms_thresh', type=float, default=0.0,
                         help="Defaults to 0.5 in yolt.c, set to 0 to turn off "\
                             +" nms in C")
+    #parser.add_argument('--test_weight_dir', type=str, default='',
+    #                    help="Directory holding trained weights")
+    #parser.add_argument('--test_weight_file', type=str, default='',
+    #                    help="Weight file, assumed to exist in test_weight_dir/")
 
-    # valid plotting
+    # test plotting
     parser.add_argument('--plot_thresh_str', type=str, default='0.3',
-                        help="Proposed thresholds to try for valid, will be split"\
+                        help="Proposed thresholds to try for test, will be split"\
                            +" into array by commas (e.g.: '0.2,0.3' => [0.2,0.3])") 
     parser.add_argument('--show_labels', type=int, default=0,
                         help="Switch to use show object labels")
     parser.add_argument('--alpha_scaling', type=int, default=0,
                         help="Switch to scale box alpha with probability")
-    parser.add_argument('--show_valid_plots', type=int, default=0,
-                        help="Switch to show plots in real time in validation")
+    parser.add_argument('--show_test_plots', type=int, default=0,
+                        help="Switch to show plots in real time in test")
+    parser.add_argument('--save_json', type=int, default=1,
+                        help="Switch to save a json in test")
+
     #parser.add_argument('--plot_names', type=int, default=0,
-    #                    help="Switch to show plots names in validation")
+    #                    help="Switch to show plots names in test")
     parser.add_argument('--rotate_boxes', type=int, default=0,
                         help="Attempt to rotate output boxes using hough lines")
-    parser.add_argument('--plot_line_thickness', type=int, default=3,
-                        help="Thickness for valid output bounding box lines")
-    parser.add_argument('--n_valid_output_plots', type=int, default=10,
-                        help="Switch to save validation pngs")
-    parser.add_argument('--valid_make_legend_and_title', type=int, default=1,
+    parser.add_argument('--plot_line_thickness', type=int, default=2,
+                        help="Thickness for test output bounding box lines")
+    parser.add_argument('--n_test_output_plots', type=int, default=10,
+                        help="Switch to save test pngs")
+    parser.add_argument('--test_make_legend_and_title', type=int, default=1,
                         help="Switch to make legend and title")    
-    parser.add_argument('--valid_im_compression_level', type=int, default=6,
+    parser.add_argument('--test_im_compression_level', type=int, default=6,
                         help="Compression level for output images."\
                             + " 1-9 (9 max compression")    
-    parser.add_argument('--keep_valid_slices', type=int, default=0,
-                        help="Switch to retain sliced valid files")
-
+    parser.add_argument('--keep_test_slices', type=int, default=0,
+                        help="Switch to retain sliced test files")
+    parser.add_argument('--shuffle_val_output_plot_ims', type=int, default=0,
+                        help="Switch to shuffle images for plotting, if 0, images are sorted")
 
     # random YOLT specific settings
     parser.add_argument('--yolt_cfg_file', type=str, default='yolo.cfg',
@@ -1883,55 +2159,57 @@ def main():
     parser.add_argument('--boxes_per_grid', type=int, default=5,
                         help="Bounding boxes per grid cell")
     
-    # YOLT test settings
-    parser.add_argument('--yolt_test_im', type=str, default='person.jpg',
-                        help="test image, in data_dir")
-    parser.add_argument('--yolt_test_thresh', type=float, default=0.2,
-                        help="prob thresh for plotting outputs")
-    parser.add_argument('--yolt_test_labels', type=str, default='coco.names',
-                        help="test labels, in data_dir")
 
+    # if evaluating spacenet data
+    parser.add_argument('--building_csv_file', type=str, default='',
+                        help="csv file for spacenet outputs")
 
-    # second validation classifier 
+    # second test classifier 
     parser.add_argument('--train_model_path2', type=str, default='',
                         help="Location of trained model")  
     parser.add_argument('--label_map_path2', type=str, 
                         default='',
                         help="Object classes")
-    parser.add_argument('--weight_dir2', type=str, default='/raid/local/src/simrdwn/yolt/input_weights',
+    parser.add_argument('--weight_dir2', type=str, default='/raid/local/src/simrdwn2/yolt/input_weights',
                         help="Directory holding trained weights")
     parser.add_argument('--weight_file2', type=str, default='',
                         help="Input weight file for second inference scale")
     parser.add_argument('--slice_sizes_str2', type=str, default='0',
-                        help="Proposed pixel slice sizes for valid2 == second"\
+                        help="Proposed pixel slice sizes for test2 == second"\
                             + "weight file.  Will be split"\
                             +" into array by commas (e.g.: '0.2,0.3' => [0.2,0.3])")
     parser.add_argument('--plot_thresh_str2', type=str, default='0.3',
-                        help="Proposed thresholds to try for valid2, will be split"\
+                        help="Proposed thresholds to try for test2, will be split"\
                            +" into array by commas (e.g.: '0.2,0.3' => [0.2,0.3])")
-    parser.add_argument('--inference_graph_path2', type=str, default='/raid/local/src/simrdwn/outputs/ssd/output_inference_graph/frozen_inference_graph.pb',
+    parser.add_argument('--inference_graph_path2', type=str, default='/raid/local/src/simrdwn2/outputs/ssd/output_inference_graph/frozen_inference_graph.pb',
                         help="Location of inference graph for tensorflow " \
                         + "object detection API")
     parser.add_argument('--yolt_cfg_file2', type=str, default='yolo.cfg',
                         help="YOLT configuration file for network, in cfg directory")
-    parser.add_argument('--val_df_root_init2', type=str, default='valid_predictions_init2.csv',
+    parser.add_argument('--val_df_root_init2', type=str, default='test_predictions_init2.csv',
                         help="Results in dataframe format")
-    parser.add_argument('--val_df_root_aug2', type=str, default='valid_predictions_aug2.csv',
+    parser.add_argument('--val_df_root_aug2', type=str, default='test_predictions_aug2.csv',
                         help="Results in dataframe format")
-    parser.add_argument('--valid_splitims_locs_file_root2', type=str, default='valid_splitims_input_files2.txt',
-                        help="Root of valid_splitims_locs_file")
+    parser.add_argument('--test_splitims_locs_file_root2', type=str, default='test_splitims_input_files2.txt',
+                        help="Root of test_splitims_locs_file")
+    #parser.add_argument('--test_prediction_pkl_root2', type=str, default='val_refine_preds2.pkl',
+     #                   help="Root of test pickle")
     
-    # total valid
-    parser.add_argument('--val_df_root_tot', type=str, default='valid_predictions_tot.csv',
+    # total test
+    parser.add_argument('--val_df_root_tot', type=str, default='test_predictions_tot.csv',
                         help="Results in dataframe format")
     parser.add_argument('--val_prediction_df_refine_tot_root_part', type=str, 
-                        default='valid_predictions_refine',
+                        default='test_predictions_refine',
                         help="Refined results in dataframe format")
+    #parser.add_argument('--test_prediction_pkl_root_tot', type=str, default='val_refine_preds_tot.pkl',
+    #                    help="Root of test pickle")
 
 
     # Defaults that rarely should need changed
-    parser.add_argument('--simrdwn_dir', type=str, default='/raid/simrdwn/',
-                        help="path to package /cosmiq/yolt2/ ")  
+    #parser.add_argument('--simrdwn_dir', type=str, default='/raid/local/src/simrdwn2/',
+    #                    help="path to package /raid/cosmiq/yolt2/ ")  
+    #parser.add_argument('--yolt_dir', type=str, default='/raid/local/src/yolt2/',
+    #                    help="path to package /raid/cosmiq/yolt2/ ")  
     parser.add_argument('--multi_band_delim', type=str, default='#',
                         help="Delimiter for multiband data")
     parser.add_argument('--zero_frac_thresh', type=float, default=0.5,
@@ -1950,10 +2228,9 @@ def main():
 ###############################################################################    
 if __name__ == "__main__":
     
-    print ("\nPermit me to introduce myself...\n" \
-            "Well, I’m glad we got that out of the way.\n")
+    print ("\n\n\nPermit me to introduce myself...\n")
+    #print ("Well, I'm glad we got that out of the way.")
     main()
     
 ###############################################################################
 ###############################################################################
-

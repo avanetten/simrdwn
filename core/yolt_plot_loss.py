@@ -193,6 +193,7 @@ def main():
     else:
         res_dir = args.res_dir
         
+    #log_dir = os.path.join(res_dir, 'logs')
     log_dir = res_dir #os.path.join(res_dir, 'logs')
 
     print ("res_dir:", res_dir)
@@ -207,6 +208,10 @@ def main():
     loss_file_p = os.path.join(log_dir, 'loss_for_plotting.txt')
     print ("loss_file_p:", loss_file_p)
 
+    # copy file because it's probably being actively written to
+    #cmd = 'cp ' + loss_file + ' ' + loss_file_p
+    #print "copy command:", cmd
+    #os.system(cmd)
     shutil.copy2(loss_file, loss_file_p)
     
     # ingest to df
@@ -229,6 +234,8 @@ def main():
                          header=0).dropna()
         
         print ("Len df:", len(df))
+        #res_dir = '/Users/avanetten/Documents/cosmiq/yolt2/results/train_cars_0.3m_cfg=ave_13x13_2017_08_12_18-35-25/'    
+        #plot_loss_4col(log_dir, plot_file=plot_file, twin_axis=twin_axis)
         plot_loss_4col(df, plot_file=plot_file,
                        ylim_perc_max=args.ylim_perc_max,
                        twin_axis=twin_axis)

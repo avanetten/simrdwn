@@ -59,7 +59,7 @@ sys.path.append(utils_path)
 import preprocess_tfrecords
 import simrdwn
 import post_process
-reload(simrdwn)
+#reload(simrdwn)
 ###################
 
 
@@ -167,8 +167,9 @@ def tf_to_df(tfrecords_filename, max_iter=50000,
             classes_str = [label_map_dict[ztmp] for ztmp in classes_int]
             classes_legend_str = [str(ztmp) + ' = ' + label_map_dict[ztmp] for ztmp in classes_int]
         
-        img_loc_string = (example.features.feature['image/filename']
-                                      .bytes_list.value[0]) 
+        img_loc_string = (str(example.features.feature['image/filename']
+                                      .bytes_list.value[0])) 
+                                      #.bytes_list.value[0].encode()) 
         if (i % 100) == 0:
             print("\n", i, "Image Location:", img_loc_string)   
             print ("  xmins:", xmins)
