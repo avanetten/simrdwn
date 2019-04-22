@@ -107,7 +107,8 @@ Training can be run with commands such as:
 		--subdivisions 16 \
 		--gpu 0
 
-
+The training script will create a results directory in _/simrdwn/results_ with the filename [framework] + [outname] + [date].  Since one cannot run TensorBoard with YOLT, we include scripts _/simrdwn/core/yolt_plot_loss.py_ and _/simrdwn/core/tf_plot_loss.py_ thatcan be called during training to inspect model convergence.  An example convergence plot is shown below.
+![Alt text](/results/__examples/tf_loss_plot.png?raw=true "Figure 1")
 ____
 
 ### 3. Test
