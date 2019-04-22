@@ -23,22 +23,22 @@ ____
 
 ### 0. Installation
 
-SIMRDWN is built to execute within a docker container on a GPU-enabled machine.  The docker command creates an Ubuntu 16.04 image with CUDA 9.0, python 3.6, and tensorflow-gpu version 1.13.1. 
+SIMRDWN is built to execute within a docker container on a GPU-enabled machine.  We use an Ubuntu 16.04 image with CUDA 9.0, python 3.6, and tensorflow-gpu version 1.13.1. 
 
 1. Clone this repository (e.g. to _/simrdwn_)
 
 2. Install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker)
  
-3. Build docker file.
+3. Build docker file
 
 		cd /simrdwn/docker
 		nvidia-docker build --no-cache -t simrdwn .
 	
 4. Spin up the docker container (see the [docker docs](https://docs.docker.com/engine/reference/commandline/run/) for options) 
 
-        nvidia-docker run -it -v /simrdwn://simrdwn --name simrdwn_container0 simrdwn
+        nvidia-docker run -it -v /simrdwn:/simrdwn --name simrdwn_container0 simrdwn
 	
-5. Coompile the Darknet C program for both YOLT2 and YOLT3.
+5. Compile the Darknet C program for both YOLT2 and YOLT3.
       
 	    cd /simrdwn/yolt2
 	    make
@@ -123,7 +123,7 @@ During the test phase, input images of arbitrary size are processed.
 	
 	
 		# SSD vehicle search
-		python /raid/local/src/simrdwn/src/simrdwn.py \
+		python /simrdwn/src/simrdwn.py \
 			--framework ssd \
 			--mode test \
 			--outname inception_v2_3class_vehicles \
@@ -145,7 +145,7 @@ During the test phase, input images of arbitrary size are processed.
 	
 			
 		# YOLT vehicle search
-		python /raid/local/src/simrdwn/core/simrdwn.py \
+		python /simrdwn/core/simrdwn.py \
 			--framework yolt \
 			--mode test \
 			--outname dense_3class_vehicles \
