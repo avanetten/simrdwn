@@ -207,7 +207,7 @@ def main():
     loss_file_p = os.path.join(log_dir, 'loss_for_plotting.txt')
     print ("loss_file_p:", loss_file_p)
 
-     shutil.copy2(loss_file, loss_file_p)
+    shutil.copy2(loss_file, loss_file_p)
     
     # ingest to df
     df_tmp = pd.read_csv(loss_file_p, sep=args.sep).dropna()

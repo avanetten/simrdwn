@@ -2,20 +2,20 @@ FROM nvidia/cuda:8.0-cudnn6-devel
 MAINTAINER Adam Van Etten
 
 ##############################################
+# Build
+# cd /raid/simrdwn/docker
+# nvidia-docker build --no-cache -t simrdwn .
+# NV_GPU=0 nvidia-docker run -it -v /raid:/raid --name simrdwn_gpu0 simrdwn
+##############################################
+
+##############################################
 # Errors encountered in the past
 # https://github.com/tensorflow/tensorflow/issues/16268
 # error in export graph, edit 
 # vi /opt/tensorflow-models/research/object_detection/exporter.py
-#  line 71 to say:
+#  change line 71 to say:
 #    rewrite_options = rewriter_config_pb2.RewriterConfig()
-# https://stackoverflow.com/questions/48920762/tensorflow-error-typeerror-init-got-an-unexpected-keyword-argument-dct
 ##############################################
-
-# scp -r /Users/avanetten/Documents/cosmiq/simrdwn/docker 10.123.0.100://raid/local/src/simrdwn
-
-# cd /raid/local/src/simrdwn/docker
-# nvidia-docker build --no-cache -t simrdwn .
-# NV_GPU=0 nvidia-docker run -it -v /raid:/raid --name simrdwn_gpu0 simrdwn
 
 
 ###################
@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       	build-essential \
         curl \
         git \
-	 cmake \
+		cmake \
         rsync \
         software-properties-common \
         unzip \
@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
         libopencv-dev \
         python-opencv \
-	python-tk \
+		python-tk \
         build-essential autoconf libtool libcunit1-dev \
         libproj-dev libgdal-dev libgeos-dev libjson0-dev vim python-gdal \
     	# requirements for keras
@@ -57,17 +57,18 @@ RUN curl -fSsL -O https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py && \
     rm get-pip.py
 RUN pip --no-cache-dir install \
-	 protobuf \
-        ipykernel \
-        jupyter \
-        matplotlib \
-        numpy \
-        scipy \
-        sklearn \
-	pandas \
-	h5py \
-	shapely \
-        && \
+		protobuf \
+		ipykernel \
+    	jupyter \
+    	matplotlib \
+    	numpy \
+    	scipy \
+    	sklearn \
+		scikit-image \
+		pandas \
+		h5py \
+		shapely \
+    	&& \
     python -m ipykernel.kernelspec
 
 
@@ -105,6 +106,6 @@ ENV PYTHONPATH $PYTHONPATH:/opt/tensorflow-models:/opt/tensorflow-models/researc
 
 ###################
 # Set up our notebook config.
-WORKDIR /raid/local/src
+WORKDIR /raid/
 # TensorBoard
 RUN ["/bin/bash"]

@@ -1,0 +1,4 @@
+Possible data sources:
+	https://spacenetchallenge.github.io/datasets/datasetHomePage.html
+    https://gdo152.llnl.gov/cowc/
+	
