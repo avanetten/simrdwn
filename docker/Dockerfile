@@ -2,7 +2,12 @@
 FROM nvidia/cuda:9.0-devel-ubuntu16.04
 MAINTAINER avanetten
 
-# IF YOU WANT TF PROGRESS PRINTED TO TERMINAL
+# nvidia-docker build -t simrdwn2.1 .  # build (use existing packages)
+# nvidia-docker build --no-cache -t simrdwn2.2 .  # rebuild from scratch
+# NV_GPU=0 nvidia-docker run -it -v /local_data:/local_data --name simrdwn2.2_gpu0 simrdwn2.2
+# NV_GPU=0 nvidia-docker run -it -v /local_data:/local_data -v /cosmiq:/cosmiq --name simrdwn2.1_gpu0 simrdwn2.1
+
+# IF YOU WANT PROGRESS PRINTED TO TERMINAL
 # Update model_main to log to screen...
 # https://stackoverflow.com/questions/52016255/tensorflow-object-detection-api-not-displaying-global-steps
 # #. Add tf.logging.set_verbosity(tf.logging.INFO) after the import section of the model_main.py script. It will display a summary after every 100th step. (Can change frequency by log_step_count)
@@ -15,6 +20,13 @@ MAINTAINER avanetten
 # once started run:
 # export PYTHONPATH=$PYTHONPATH:/tensorflow/models/research/:/tensorflow/models/research/slim
 
+# # check if it's using gpu
+# python
+# import tensorflow as tf
+# sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+
+# resources:
+#. https://github.com/jkjung-avt/hand-detection-tutorial
 
 ENV CUDNN_VERSION 7.3.0.29
 LABEL com.nvidia.cudnn.version="${CUDNN_VERSION}"
@@ -91,8 +103,8 @@ ENV KERAS_BACKEND=tensorflow
 RUN source activate simrdwn2 \
   && conda install -n simrdwn2 keras
 
-
 RUN conda install -n simrdwn2 \
+	              #awscli \
 	              affine \
 	              pyproj \
 	              pyhamcrest=1.9.0 \
@@ -108,6 +120,8 @@ RUN conda install -n simrdwn2 \
 	              matplotlib \
 				  ncurses \
 	              numpy \
+	              #opencv=3.4.1 \
+	              #py-opencv \
 	              pandas \
 	              pillow \
 	              pip \
@@ -127,11 +141,19 @@ RUN conda install -n simrdwn2 \
 	&& conda clean -t \
 	&& conda clean --yes --all 
 
+RUN pip install statsmodels				 
 				  
 # tf object detection api
 RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
+#WORKDIR /tensorflow/models/research/
+#RUN protoc object_detection/protos/*.proto --python_out=.
+# WORKDIR /tensorflow/models/research/
+# RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+# ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/slim
+# ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/research/slim
 
 # also need coco api
+# manually
 # From tensorflow/models/research/
 WORKDIR /tensorflow/models/research/
 RUN wget -O protobuf.zip https://github.com/google/protobuf/releases/download/v3.0.0/protoc-3.0.0-linux-x86_64.zip
@@ -148,6 +170,7 @@ ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/research/slim
 # # add a jupyter kernel for the conda environment in case it's wanted
 RUN source activate simrdwn2 && python -m ipykernel.kernelspec
 RUN python -m ipykernel.kernelspec
+
 
 ###################
 # Set up our notebook config.
