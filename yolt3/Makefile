@@ -4,21 +4,30 @@ OPENCV=1
 OPENMP=0
 DEBUG=0
 
-ARCH=  -gencode arch=compute_30,code=sm_30 \
-       -gencode arch=compute_35,code=sm_35 \
-       -gencode arch=compute_50,code=[sm_50,compute_50] \
-       -gencode arch=compute_52,code=[sm_52,compute_52] \
-       -gencode arch=compute_61,code=[sm_61,compute_61]
+# nvcc --version
 
-# ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
-#        -gencode arch=compute_30,code=sm_30 \
+# https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
+# ARCH = 	-gencode=arch=compute_50,code=sm_50 \
+# 		-gencode=arch=compute_52,code=sm_52 \
+# 		-gencode=arch=compute_60,code=sm_60 \
+# 		-gencode=arch=compute_61,code=sm_61 \
+# 		-gencode=arch=compute_70,code=sm_70 \
+# 		-gencode=arch=compute_75,code=sm_75 \
+# 		-gencode=arch=compute_75,code=compute_75
+		
+ARCH=  -gencode arch=compute_50,code=[sm_50,compute_50] \
+       -gencode arch=compute_52,code=[sm_52,compute_52] \
+       -gencode arch=compute_60,code=[sm_60,compute_60] \
+       -gencode arch=compute_61,code=[sm_61,compute_61] \
+       -gencode arch=compute_62,code=[sm_62,compute_62] \
+       -gencode arch=compute_70,code=[sm_70,compute_70]
+       #-gencode arch=compute_75,code=[sm_75,compute_75]
+	   
+# ARCH=  -gencode arch=compute_30,code=sm_30 \
 #        -gencode arch=compute_35,code=sm_35 \
 #        -gencode arch=compute_50,code=[sm_50,compute_50] \
 #        -gencode arch=compute_52,code=[sm_52,compute_52] \
 #        -gencode arch=compute_61,code=[sm_61,compute_61]
-
-# This is what I use, uncomment if you know your arch and want to specify
-# ARCH= -gencode arch=compute_52,code=compute_52
 
 VPATH=./src/:./examples
 SLIB=libdarknet.so

@@ -23,20 +23,20 @@ ____
 
 ### 0. Installation
 
-SIMRDWN is built to execute within a docker container on a GPU-enabled machine.  We use an Ubuntu 16.04 image with CUDA 9.0, python 3.6, and tensorflow-gpu version 1.13.1. 
+SIMRDWN is built to execute within a docker container on a GPU-enabled machine.  The docker command creates an Ubuntu 16.04 image with CUDA 9.0, python 3.6, and tensorflow-gpu version 1.13.1. 
 
 1. Clone this repository (e.g. to _/simrdwn_)
 
 2. Install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker)
  
-3. Build docker file
+3. Build docker file.
 
 		cd /simrdwn/docker
 		nvidia-docker build --no-cache -t simrdwn .
 	
 4. Spin up the docker container (see the [docker docs](https://docs.docker.com/engine/reference/commandline/run/) for options) 
 
-        nvidia-docker run -it -v /simrdwn:/simrdwn --name simrdwn_container0 simrdwn
+        nvidia-docker run -it -v /simrdwn://simrdwn --name simrdwn_container0 simrdwn
 	
 5. Compile the Darknet C program for both YOLT2 and YOLT3.
       
@@ -58,9 +58,7 @@ Training data needs to be transformed to the YOLO format of training images in a
 
     <object-class> <x> <y> <width> <height>
 
-Where x, y, width, and height are relative to the image's width and height.  Running a script such as _/simrdwn/core/parse\_cowc.py_ extracts training windows of reasonable size (usually 416 or 544 pixels in extent) from large labeleled images of the [COWC](https://gdo152.llnl.gov/cowc/) dataset.  The script then transforms the labels corresponding to these windows into the correct format and creates a list of all training input images in _/simdwn/data/training\_list.txt_.  Class integers are 0-indexex in YOLT, though they are 1-indexed in tensorflow; this can cause some confusion...
-
-We also need to define the object classes with a .pbtxt file, such as _/simrdwn/data/class\_labels\_car.pbtxt_
+Where x, y, width, and height are relative to the image's width and height.  Running a script such as _/simrdwn/data\_prep_/parse\_cowc.py_ extracts training windows of reasonable size (usually 416 or 544 pixels in extent) from large labeleled images of the [COWC](https://gdo152.llnl.gov/cowc/) dataset.  The script then transforms the labels corresponding to these windows into the correct format and creates a list of all training input images in _/data/train\_data/training\_list.txt_.  We also need to define the object classes with a .pbtxt file, such as _/data/training\_data/class\_labels\_car.pbtxt_.  Class integers should be 1-indexed in the .pbtxt file.
 
 ####  1B. Create .tfrecord (optional)
 If the tensorflow object detection API models are being run, we must transform the training data into the .tfrecord format.  This is accomplished via the _simrdwn/core/preprocess\_tfrecords.py_ script.
@@ -83,32 +81,26 @@ Training can be run with commands such as:
 	python /simrdwn/core/simrdwn.py \
 		--framework ssd \
 		--mode train \
-		--outname inception_v2_3class_vehicles \
-		--label_map_path /simrdwn/data/class_labels_airplane_boat_car.pbtxt \
-		--tf_cfg_train_file /simrdwn/configs/_altered_v0/ssd_inception_v2_simrdwn.config \
-		--train_tf_record /simrdwn/data/labels_airplane_boat_car_train.tfrecord \
+		--outname inception_v2_cowc \
+		--label_map_path /simrdwn/data/class_labels_car.pbtxt \
+		--tf_cfg_train_file _altered_v0/ssd_inception_v2_simrdwn.config \
+		--train_tf_record cowc/cowc_train.tfrecord \
 		--max_batches 30000 \
-		--batch_size 16 \
-		--gpu 0
-		
+		--batch_size 16 
+	
 	# YOLT vechicle search
 	python /simrdwn/core/simrdwn.py \
 		--framework yolt2 \
 		--mode train \
-		--outname dense_3class_vehicles \
+		--outname dense_cars \
 		--yolt_cfg_file ave_dense.cfg  \
-		--weight_dir /simrdwn/yolt2/input_weights \
 		--weight_file yolo.weights \
-		--yolt_train_images_list_file labels_airplane_boat_car_list.txt \
-		--label_map_path /simrdwn/data/class_labels_airplane_boat_car.pbtxt \
-		--nbands 3 \
+		--yolt_train_images_list_file cowc_yolt_train_list.txt \
+		--label_map_path class_labels_car.pbtxt \
 		--max_batches 30000 \
 		--batch_size 64 \
-		--subdivisions 16 \
-		--gpu 0
+		--subdivisions 16
 
-The training script will create a results directory in _/simrdwn/results_ with the filename [framework] + [outname] + [date].  Since one cannot run TensorBoard with YOLT, we include scripts _/simrdwn/core/yolt_plot_loss.py_ and _/simrdwn/core/tf_plot_loss.py_ thatcan be called during training to inspect model convergence.  An example convergence plot is shown below.
-![Alt text](/results/__examples/tf_loss_plot.png?raw=true "Figure 1")
 ____
 
 ### 3. Test
@@ -124,15 +116,15 @@ During the test phase, input images of arbitrary size are processed.
 	
 	
 		# SSD vehicle search
-		python /simrdwn/src/simrdwn.py \
+		python /raid/local/src/simrdwn/src/simrdwn.py \
 			--framework ssd \
 			--mode test \
-			--outname inception_v2_3class_vehicles \
-		    --label_map_path '/simrdwn/train_data/class_labels_car.pbtxt' \		
-			--train_model_path '/simrdwn/results/ssd_train_path' \
-			--tf_cfg_train_file ssd_inception_v2_simrdwn_orig.config \
+			--outname inception_v2_cowc \
+			--label_map_path class_labels_car.pbtxt \
+			--train_model_path [ssd_train_path] \
+			--tf_cfg_train_file ssd_inception_v2_simrdwn.config \
 			--use_tfrecords=1 \
-			--testims_dir 'vechicle_test'  \
+			--testims_dir cowc/Utah_AGRC  \
 			--keep_test_slices 0 \
 			--test_slice_sep __ \
 			--test_make_legend_and_title 0 \
@@ -143,18 +135,17 @@ During the test phase, input images of arbitrary size are processed.
 			--slice_overlap 0.2 \
 			--alpha_scaling 1 \
 			--show_labels 0
-	
-			
+				
 		# YOLT vehicle search
-		python /simrdwn/core/simrdwn.py \
+		python /raid/local/src/simrdwn/core/simrdwn.py \
 			--framework yolt \
 			--mode test \
-			--outname dense_3class_vehicles \
-		    --label_map_path '/simrdwn/train_data/class_labels_car.pbtxt' \		
-			--train_model_path '/simrdwn/results/yolt2_train_path' \
+			--outname dense_cowc \
+			--label_map_path class_labels_car.pbtxt \
+			--train_model_path [yolt2_train_path] \
 			--weight_file ave_dense_final.weights \
 			--yolt_cfg_file ave_dense.cfg \
-			--testims_dir 'vechicle_test'  \
+			--testims_dir cowc/Utah_AGRC  \
 			--keep_test_slices 0 \
 			--test_slice_sep __ \
 			--test_make_legend_and_title 0 \
