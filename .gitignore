@@ -1,3 +1,7 @@
-utils/
 _backup/
+_extras/
+results/
+notes/
 .DS_Store
+__pycache__/
+.weights

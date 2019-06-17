@@ -36,7 +36,7 @@ SIMRDWN is built to execute within a docker container on a GPU-enabled machine. 
 	
 4. Spin up the docker container (see the [docker docs](https://docs.docker.com/engine/reference/commandline/run/) for options) 
 
-        nvidia-docker run -it -v /simrdwn://simrdwn --name simrdwn_container0 simrdwn
+        nvidia-docker run -it -v /simrdwn:/simrdwn --name simrdwn_container0 simrdwn
 	
 5. Compile the Darknet C program for both YOLT2 and YOLT3.
       
