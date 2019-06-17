@@ -2,9 +2,6 @@
 FROM nvidia/cuda:9.0-devel-ubuntu16.04
 MAINTAINER avanetten
 
-# GPU07
-# scp -r  -i /Users/avanetten/.ssh/ave_ssh /raid/cosmiq/simrdwn2/docker 10.123.1.26:/local_data/simrdwn2/
-# cd /local_data/simrdwn2/docker
 # nvidia-docker build -t simrdwn2.1 .  # build (use existing packages)
 # nvidia-docker build --no-cache -t simrdwn2.2 .  # rebuild from scratch
 # NV_GPU=0 nvidia-docker run -it -v /local_data:/local_data --name simrdwn2.2_gpu0 simrdwn2.2
@@ -139,9 +136,7 @@ RUN conda install -n simrdwn2 \
 	              pandas \
 	              geopandas \
 	              rasterio \
-	              #osmnx=0.8.2 \
 				  opencv=4.0.0 \
-				  # statsmodels \
 	&& conda clean -p \
 	&& conda clean -t \
 	&& conda clean --yes --all 
@@ -171,27 +166,6 @@ WORKDIR /tensorflow/models/research/
 RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
 ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/slim
 ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/research/slim
-
-# # this always seems to fail, so do it manually (as above)
-# RUN git clone https://github.com/cocodataset/cocoapi.git /cocoapi
-# WORKDIR /cocoapi/PythonAPI
-# RUN make
-# RUN cp -r pycocotools /tensorflow/models/research/
-# # From tensorflow/models/research/
-# WORKDIR /tensorflow/models/research/
-# RUN protoc object_detection/protos/*.proto --python_out=.
-
-# # test
-# WORKDIR /tensorflow/models/research/
-# RUN PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
-# RUN python /tensorflow/models/research/object_detection/builders/model_builder_test.py
-#
-# # RUN source activate simrdwn && \
-# #      python /tensorflow/models/research/object_detection/builders/model_builder_test.py
-# # # ENV MODELS_DIR /tensorflow/models/research/
-# # # PYTHONPATH=${MODELS_DIR}/research:$MODELS_DIR/research/slim \
-# # #PYTHON $MODELS_DIR/research/object_detection/builders/model_builder_test.py
-
 
 # # add a jupyter kernel for the conda environment in case it's wanted
 RUN source activate simrdwn2 && python -m ipykernel.kernelspec
