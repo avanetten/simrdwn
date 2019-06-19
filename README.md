@@ -45,6 +45,10 @@ SIMRDWN is built to execute within a docker container on a GPU-enabled machine. 
 	    cd /simrdwn/yolt3
 	    make
 
+6. Get help on SIMRDWN options
+	
+		python /simrdwn/simrdwn/core/simrdwn.py --help
+	
 
 ____
 
