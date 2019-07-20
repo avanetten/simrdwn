@@ -548,6 +548,8 @@ def refine_df(df, groupby='Image_Path',
                     if verbose:
                         print("num boxes_all:", len(xmins))
                         print("num good_idxs:", len(good_idxs))
+                    if len(boxes) == 0:
+                        print("Error, No boxes detected!")
                     boxes = boxes[good_idxs]
                     scores = scores[good_idxs]
                     df_idxs = df_idxs[good_idxs]

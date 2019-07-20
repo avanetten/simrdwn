@@ -68,8 +68,7 @@ metrics).
 tf.flags.DEFINE_string('inference_graph', None,
                        'Path to the inference graph with embedded weights.')
 tf.flags.DEFINE_boolean('verbose', False, 'Lots o print statements')
-tf.flags.DEFINE_boolean('use_tfrecords', True, 'Switch to use tfrecords')
-
+tf.flags.DEFINE_boolean('use_tfrecords', False, 'Switch to use tfrecords')
 
 # tfrecords
 tf.flags.DEFINE_string('input_tfrecord_paths', None,
@@ -97,8 +96,8 @@ tf.flags.DEFINE_integer('GPU', 0,
 tf.flags.DEFINE_integer('BGR2RGB', 0,
                         'Sometimes we need to change cv2 images to BGR')
 
-
 FLAGS = tf.flags.FLAGS
+# print("FLAGS:", FLAGS)
 
 
 ###############################################################################
@@ -166,7 +165,7 @@ def main(_):
                                     str(t1 - t0) + ' seconds')
 
     else:
-
+        # infer on csv
         if FLAGS.verbose:
             print("min_thresh:", FLAGS.min_thresh)
         t0 = time.time()
@@ -180,7 +179,7 @@ def main(_):
                 tf.import_graph_def(graph_def, name='')
         print("Time to load graph:", time.time() - t0, "seconds")
 
-        with open(FLAGS.output_csv_path, 'wb') as csvfile:
+        with open(FLAGS.output_csv_path, 'w') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=',')
             output_columns = ['Loc_Tmp', u'Prob', u'Xmin',
                               u'Ymin', u'Xmax', u'Ymax', u'Category']
@@ -196,9 +195,19 @@ def main(_):
 
                     line_count = 0
                     for i, image_path in enumerate(image_paths):
-
                         image_root = os.path.basename(image_path).strip()
-                        image_bgr = cv2.imread(image_path.strip(), 1)
+                        # print("image_path:", image_path)
+                        # print("str image_path.strip", str(image_path.strip()))
+                        # print("image_path.strip", image_path.strip().decode('utf-8'))
+                         #print("str image_path.strip", str(image_path.strip().decode('utf-8')))
+                        # print("os.path.exists image_path.strip", os.path.exists(image_path.strip()))
+                        # print("os.path.exists str image_path.strip", os.path.exists(str(image_path.strip())))
+                        # print("os.path.exists str image_path.strip", os.path.exists(str(image_path.strip()).strip()))
+                        # print("os.path.exists str image_path.strip", os.path.exists(str(image_path.strip().decode('utf-8'))))
+
+                        # image_bgr = cv2.imread(image_path, cv2.IMREAD_COLOR)
+                        # image_bgr = cv2.imread(str(image_path.strip()), 1)
+                        image_bgr = cv2.imread(str(image_path.strip().decode('utf-8')), 1)
                         # invert colors, if required
                         if FLAGS.BGR2RGB == 1:
                             image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)

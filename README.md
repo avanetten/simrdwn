@@ -127,7 +127,7 @@ During the test phase, input images of arbitrary size are processed.
 			--label_map_path class_labels_car.pbtxt \
 			--train_model_path [ssd_train_path] \
 			--tf_cfg_train_file ssd_inception_v2_simrdwn.config \
-			--use_tfrecords=1 \
+			--use_tfrecords=0 \
 			--testims_dir cowc/Utah_AGRC  \
 			--keep_test_slices 0 \
 			--test_slice_sep __ \
@@ -142,7 +142,7 @@ During the test phase, input images of arbitrary size are processed.
 				
 		# YOLT vehicle search
 		python /raid/local/src/simrdwn/core/simrdwn.py \
-			--framework yolt \
+			--framework yolt2 \
 			--mode test \
 			--outname dense_cowc \
 			--label_map_path class_labels_car.pbtxt \

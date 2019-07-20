@@ -122,7 +122,8 @@ def update_args(args):
         args.test_tfrecord_out = os.path.join(
             args.results_dir, 'predictions.tfrecord')
     else:
-        args.test_presliced_tfrecord_tot, args.test_tfrecord_out = '', ''
+        args.test_presliced_tfrecord_tot = ''
+        args.test_tfrecord_out = ''
 
     if len(args.test_presliced_list) > 0:
         args.test_splitims_locs_file = args.test_presliced_list_tot
@@ -161,7 +162,7 @@ def update_args(args):
         args.weight_file_tot = os.path.join(
             args.results_topdir, args.train_model_path, args.weight_file)
         args.tf_cfg_train_file = os.path.join(
-            args.results_topdir, args.train_model_path, 'logs',
+            args.results_topdir, args.train_model_path,  # 'logs',
             args.tf_cfg_train_file)
 
         # assume weights and cfg are in the training dir
@@ -182,7 +183,6 @@ def update_args(args):
     else:
         args.train_tf_record = os.path.join(
             args.train_data_dir, args.train_tf_record)
-
 
     ##########################
     # set tf cfg file out
@@ -572,7 +572,7 @@ def tf_infer_cmd_dual(inference_graph_path='',
                       input_file_list='',
                       in_tfrecord_path='',
                       out_tfrecord_path='',
-                      use_tfrecords=1,
+                      use_tfrecords=0,
                       min_thresh=0.05,
                       GPU=0,
                       BGR2RGB=0,
@@ -594,19 +594,21 @@ def tf_infer_cmd_dual(inference_graph_path='',
         'python',
         infer_src_path + '/' + 'infer_detections.py',
         '--inference_graph=' + inference_graph_path,
-        '--GPU=' + str(GPU),
-        '--use_tfrecord=' + str(use_tfrecords),
-
+        '--GPU=' + str(GPU)
+        ]
+    if bool(use_tfrecords):
+        cmd_arg_list.extend(['--use_tfrecord=' + str(use_tfrecords)])
+        
+    cmd_arg_list.extend([
         # first method, with tfrecords
         '--input_tfrecord_paths=' + in_tfrecord_path,
         '--output_tfrecord_path=' + out_tfrecord_path,
-
         # second method, with file list
         '--input_file_list=' + input_file_list,
         '--BGR2RGB=' + str(BGR2RGB),
         '--output_csv_path=' + output_csv_path,
         '--min_thresh=' + str(min_thresh)
-    ]
+    ])
     cmd = ' '.join(cmd_arg_list)
 
     return cmd
@@ -1019,6 +1021,8 @@ def run_test(framework='YOLT2',
 
     t0 = time.time()
     # run command
+    print("Running", infer_cmd)
+    os.system('echo ' + infer_cmd + ' >> ' + log_file)
     os.system(infer_cmd)  # run_cmd(outcmd)
     t1 = time.time()
     cmd_time_str = '"\nLength of time to run command: ' + infer_cmd \
@@ -1472,7 +1476,9 @@ def execute(args, train_cmd1, test_cmd_tot, test_cmd_tot2=''):
                                 zero_frac_thresh=args.zero_frac_thresh,
                                 )
             # return if only interested in prepping
-            if bool(args.test_prep_only):
+            if (bool(args.test_prep_only)) \
+                    and (bool(args.use_tfrecords)):
+                    # or (args.framework.upper() not in ['YOLT2', 'YOLT3']):
                 print("Convert to tfrecords...")
                 TF_RecordPath = os.path.join(
                     args.results_dir, 'test_splitims.tfrecord')
@@ -1481,7 +1487,6 @@ def execute(args, train_cmd1, test_cmd_tot, test_cmd_tot2=''):
                     args.label_map_dict, TF_RecordPath,
                     TF_PathVal='', val_frac=0.0,
                     convert_dict={}, verbose=False)
-
                 print("Done prepping test files, ending")
                 return
 
@@ -1668,7 +1673,7 @@ def execute(args, train_cmd1, test_cmd_tot, test_cmd_tot2=''):
             print("Num objects at thresh:", plot_thresh_tmp, "=",
                   len(df_refine))
             # save json
-            if bool(args.save_json):
+            if bool(args.save_json) and (len(json) > 0):
                 output_json_path = os.path.join(args.results_dir,
                                                 args.val_prediction_df_refine_tot_root_part +
                                                 '_thresh=' + str(plot_thresh_tmp) + '.GeoJSON')
@@ -1772,7 +1777,7 @@ def main():
     # test settings
     parser.add_argument('--train_model_path', type=str, default='',
                         help="Location of trained model")
-    parser.add_argument('--use_tfrecords', type=int, default=1,
+    parser.add_argument('--use_tfrecords', type=int, default=0,
                         help="Switch to use tfrecords for inference")
     parser.add_argument('--test_presliced_tfrecord_path', type=str, default='',
                         help="Location of presliced training data tfrecord "

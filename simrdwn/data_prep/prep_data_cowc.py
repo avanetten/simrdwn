@@ -47,15 +47,6 @@ test_out_dir = '/cosmiq/src/simrdwn3/data/test_images/cowc'
 # label_path_root = '/local_data/simrdwn3/data/train_data'
 # test_out_dir = '/local_data/simrdwn3/data/test_images/cowc'
 
-
-# dev box
-# cowc_data_dir = '/raid/data/gdo152.ucllnl.org/cowc/datasets/ground_truth_sets/'
-# simrdwn_data_dir = '/raid/simrdwn/data/'
-# train_out_dir = '/raid/simrdwn/training_datasets/cowc/'
-# test_out_dir = '/raid/simrdwn/test_images/cowc/'
-# label_map_file = 'class_labels_car.pbtxt'
-# verbose = True
-
 label_map_path = os.path.join(label_path_root, label_map_file)
 print ("label_map_path:", label_map_path)
 
