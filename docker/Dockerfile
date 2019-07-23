@@ -108,11 +108,10 @@ RUN source activate simrdwn \
 	              geopandas=0.5.0 \
 				  opencv=4.1.0 \
 	              affine=2.2.2 \
-	              pyproj=2.1.3 \
+	              pyproj=1.9.6 \
 	              pyhamcrest=1.9.0 \
 	              cython=0.29.10 \
 				  contextlib2=0.5.5 \
-	              h5py=2.9.0 \
 	              ncurses=6.1 \
 	              jupyter=1.0.0 \
 	              jupyterlab=0.35.6 \
@@ -133,6 +132,7 @@ RUN source activate simrdwn \
 	&& conda clean -p \
 	&& conda clean -t \
 	&& conda clean --yes --all 
+#	%% conda build purge-all \
 
 # Below is a hack to get around conda issues (2019-07-19)
 RUN source activate simrdwn \
