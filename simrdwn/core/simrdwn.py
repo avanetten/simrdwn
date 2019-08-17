@@ -1124,7 +1124,7 @@ def run_test(framework='YOLT2',
     # plot
 
     # add geo coords to eall boxes?
-    if test_add_geo_coords:
+    if test_add_geo_coords and len(df_tot) > 0:
         ###########################################
         # !!!!! Skip?
         # json = None
@@ -1544,17 +1544,20 @@ def execute(args, train_cmd1, test_cmd_tot, test_cmd_tot2=''):
                                 rotate_boxes=args.rotate_boxes,
                                 test_add_geo_coords=args.test_add_geo_coords)
 
-        # save to csv
-        df_tot.to_csv(args.val_df_path_aug, index=False)
-        # get number of files
-        n_files = len(np.unique(df_tot['Loc_Tmp'].values))
-        # n_files = str(len(test_files_locs_list)
-        t4 = time.time()
-        cmd_time_str = '"Length of time to run test for ' \
-            + str(n_files) + ' files = ' \
-            + str(t4 - t3) + ' seconds\n"'
-        print(cmd_time_str[1:-1])
-        os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
+        if len(df_tot) == 0:
+            print("No detections found!")
+        else:
+            # save to csv
+            df_tot.to_csv(args.val_df_path_aug, index=False)
+            # get number of files
+            n_files = len(np.unique(df_tot['Loc_Tmp'].values))
+            # n_files = str(len(test_files_locs_list)
+            t4 = time.time()
+            cmd_time_str = '"Length of time to run test for ' \
+                + str(n_files) + ' files = ' \
+                + str(t4 - t3) + ' seconds\n"'
+            print(cmd_time_str[1:-1])
+            os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
 
         # run again, if desired
         if len(args.weight_file2) > 0:
@@ -1620,69 +1623,70 @@ def execute(args, train_cmd1, test_cmd_tot, test_cmd_tot2=''):
             sliced = False
         print("test data sliced?", sliced)
 
-        # refine for each plot_thresh
-        for plot_thresh_tmp in args.plot_thresh:
-            print("Plotting at:", plot_thresh_tmp)
-            groupby = 'Image_Path'
-            groupby_cat = 'Category'
-            df_refine = post_process.refine_df(df_tot,
-                                               groupby=groupby,
-                                               groupby_cat=groupby_cat,
-                                               nms_overlap_thresh=args.nms_overlap_thresh,
-                                               plot_thresh=plot_thresh_tmp,
-                                               verbose=False)
-            # make some output plots, if desired
-            if len(args.building_csv_file) > 0:
-                building_csv_file_tmp = args.building_csv_file.split('.')[0] \
-                    + '_plot_thresh_' + str(plot_thresh_tmp).replace('.', 'p') \
-                    + '.csv'
-            else:
-                building_csv_file_tmp = ''
-            if args.n_test_output_plots > 0:
-                post_process.plot_refined_df(df_refine, groupby=groupby,
-                                             label_map_dict=args.label_map_dict_tot,
-                                             outdir=args.results_dir,
-                                             plot_thresh=plot_thresh_tmp,
-                                             show_labels=bool(
-                                                 args.show_labels),
-                                             alpha_scaling=bool(
-                                                 args.alpha_scaling),
-                                             plot_line_thickness=args.plot_line_thickness,
-                                             print_iter=5,
-                                             n_plots=args.n_test_output_plots,
-                                             building_csv_file=building_csv_file_tmp,
-                                             shuffle_ims=bool(
-                                                 args.shuffle_val_output_plot_ims),
-                                             verbose=False)
-
-            # geo coords?
-            if bool(args.test_add_geo_coords):
-                df_refine, json = add_geo_coords.add_geo_coords_to_df(
-                    df_refine,
-                    create_geojson=bool(args.save_json),
-                    inProj_str='epsg:32737', outProj_str='epsg:3857',
-                    # inProj_str='epsg:4326', outProj_str='epsg:3857',
-                    verbose=False)
-
-            # save df_refine
-            outpath_tmp = os.path.join(args.results_dir,
-                                       args.val_prediction_df_refine_tot_root_part +
-                                       '_thresh=' + str(plot_thresh_tmp) + '.csv')
-            # df_refine.to_csv(args.val_prediction_df_refine_tot)
-            df_refine.to_csv(outpath_tmp)
-            print("Num objects at thresh:", plot_thresh_tmp, "=",
-                  len(df_refine))
-            # save json
-            if bool(args.save_json) and (len(json) > 0):
-                output_json_path = os.path.join(args.results_dir,
-                                                args.val_prediction_df_refine_tot_root_part +
-                                                '_thresh=' + str(plot_thresh_tmp) + '.GeoJSON')
-                json.to_file(output_json_path, driver="GeoJSON")
-
-        cmd_time_str = '"Length of time to run refine_test()' + ' ' \
-            + str(time.time() - t8) + ' seconds"'
-        print(cmd_time_str[1:-1])
-        os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
+        # refine for each plot_thresh (if we have detections)
+        if len(df_tot) > 0:
+            for plot_thresh_tmp in args.plot_thresh:
+                print("Plotting at:", plot_thresh_tmp)
+                groupby = 'Image_Path'
+                groupby_cat = 'Category'
+                df_refine = post_process.refine_df(df_tot,
+                                                   groupby=groupby,
+                                                   groupby_cat=groupby_cat,
+                                                   nms_overlap_thresh=args.nms_overlap_thresh,
+                                                   plot_thresh=plot_thresh_tmp,
+                                                   verbose=False)
+                # make some output plots, if desired
+                if len(args.building_csv_file) > 0:
+                    building_csv_file_tmp = args.building_csv_file.split('.')[0] \
+                        + '_plot_thresh_' + str(plot_thresh_tmp).replace('.', 'p') \
+                        + '.csv'
+                else:
+                    building_csv_file_tmp = ''
+                if args.n_test_output_plots > 0:
+                    post_process.plot_refined_df(df_refine, groupby=groupby,
+                                                 label_map_dict=args.label_map_dict_tot,
+                                                 outdir=args.results_dir,
+                                                 plot_thresh=plot_thresh_tmp,
+                                                 show_labels=bool(
+                                                     args.show_labels),
+                                                 alpha_scaling=bool(
+                                                     args.alpha_scaling),
+                                                 plot_line_thickness=args.plot_line_thickness,
+                                                 print_iter=5,
+                                                 n_plots=args.n_test_output_plots,
+                                                 building_csv_file=building_csv_file_tmp,
+                                                 shuffle_ims=bool(
+                                                     args.shuffle_val_output_plot_ims),
+                                                 verbose=False)
+    
+                # geo coords?
+                if bool(args.test_add_geo_coords):
+                    df_refine, json = add_geo_coords.add_geo_coords_to_df(
+                        df_refine,
+                        create_geojson=bool(args.save_json),
+                        inProj_str='epsg:32737', outProj_str='epsg:3857',
+                        # inProj_str='epsg:4326', outProj_str='epsg:3857',
+                        verbose=False)
+    
+                # save df_refine
+                outpath_tmp = os.path.join(args.results_dir,
+                                           args.val_prediction_df_refine_tot_root_part +
+                                           '_thresh=' + str(plot_thresh_tmp) + '.csv')
+                # df_refine.to_csv(args.val_prediction_df_refine_tot)
+                df_refine.to_csv(outpath_tmp)
+                print("Num objects at thresh:", plot_thresh_tmp, "=",
+                      len(df_refine))
+                # save json
+                if bool(args.save_json) and (len(json) > 0):
+                    output_json_path = os.path.join(args.results_dir,
+                                                    args.val_prediction_df_refine_tot_root_part +
+                                                    '_thresh=' + str(plot_thresh_tmp) + '.GeoJSON')
+                    json.to_file(output_json_path, driver="GeoJSON")
+    
+            cmd_time_str = '"Length of time to run refine_test()' + ' ' \
+                + str(time.time() - t8) + ' seconds"'
+            print(cmd_time_str[1:-1])
+            os.system('echo ' + cmd_time_str + ' >> ' + args.log_file)
 
         # remove or zip test_split_dirs to save space
         if len(test_split_dir_list) > 0:
