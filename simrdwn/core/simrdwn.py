@@ -205,7 +205,8 @@ def update_args(args):
     args.test_add_geo_coords = bool(args.test_add_geo_coords)
 
     # set cuda values
-    if args.gpu >= 0:
+    # if args.gpu >= 0:
+    if args.gpu != "-1":
         args.use_GPU, args.use_CUDNN = 1, 1
     else:
         args.use_GPU, args.use_CUDNN = 0, 0
@@ -661,6 +662,7 @@ def yolt_command(framework='yolt2',
     else:
         gpu_cmd = '-i ' + str(gpu)
         # gpu_cmd = '-i ' + str(3-args.gpu) # originally, numbers were reversed
+    ngpus = len(gpu.split(','))
 
     ##########################
     # SET VARIABLES ACCORDING TO MODE (SET UNNECCESSARY VALUES TO 0 OR NULL)
@@ -713,6 +715,7 @@ def yolt_command(framework='yolt2',
         str(nbands),
         yolt_loss_file,
         str(min_retain_prob),
+        str(ngpus),
         suffix
     ]
 
@@ -1732,8 +1735,9 @@ def main():
                         help="object detection framework [yolt2, 'yolt3', ssd, faster_rcnn]")
     parser.add_argument('--mode', type=str, default='test',
                         help="[compile, test, train, test]")
-    parser.add_argument('--gpu', type=int, default=0,
-                        help="GPU number, set < 0 to turn off GPU support")
+    parser.add_argument('--gpu', type=str, default="0",
+                        help="GPU number, set < 0 to turn off GPU support " \
+                        "to use multiple, use '0,1'")
     parser.add_argument('--single_gpu_machine', type=int, default=0,
                         help="Switch to use a machine with just one gpu")
     parser.add_argument('--nbands', type=int, default=3,

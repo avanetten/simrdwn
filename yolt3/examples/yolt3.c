@@ -169,11 +169,8 @@ void print_yolt_detections(FILE **fps, char *id, detection *dets, int total, int
 }
 
 // AVE
-void train_yolt3(char *cfgfile, char *weightfile, char *train_images, char *results_dir, int nbands, char *loss_file)//, int *gpus, int ngpus, int clear)
+void train_yolt3(char *cfgfile, char *weightfile, char *train_images, char *results_dir, int nbands, char *loss_file, int *gpus, int ngpus, int reset_seen)
 {	
-	int reset_seen = 1;
-	int ngpus = 1;
-	int *gpus;
 	
     srand(time(0));
     char *base = basecfg(cfgfile);
@@ -202,28 +199,20 @@ void train_yolt3(char *cfgfile, char *weightfile, char *train_images, char *resu
     srand(time(0));
     int seed = rand();
     int i;
-    fprintf(stderr, "%s\n", "Check0");
-	// cuda_set_device(gpus[0]);
-    fprintf(stderr, "%s\n", "Check1");
-	nets[0] = load_network(cfgfile, weightfile, reset_seen);
-    fprintf(stderr, "%s\n", "Check2");
+    for(i = 0; i < ngpus; ++i){
+        srand(seed);
+#ifdef GPU
+        cuda_set_device(gpus[i]);
+#endif
+        nets[i] = load_network(cfgfile, weightfile, reset_seen);
+        // if(reset_seen) *nets[i].seen = 0;
+        nets[i]->learning_rate *= ngpus;
+    }
+    srand(time(0));
     network *net = nets[0];
-    fprintf(stderr, "%s\n", "Check3");
-	
-	
-	// multi gpu
-//     for(i = 0; i < ngpus; ++i){
-//         srand(seed);
-// #ifdef GPU
-//         cuda_set_device(gpus[i]);
-// #endif
-//         nets[i] = load_network(cfgfile, weightfile, clear);
-//         nets[i]->learning_rate *= ngpus;
-//     }
-//     srand(time(0));
-//     network *net = nets[0];
 
     int imgs = net->batch * net->subdivisions * ngpus;
+	i = 0;  // *net.seen/imgs;
     printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
     fprintf(stderr, "\n\n\n\nNum images = %d,\ni= %d\n", imgs, i);
     data train, buffer;
@@ -359,7 +348,7 @@ void validate_yolt3(char *cfgfile, char *weightfile, char *valid_list_loc,
     set_batch_network(net, 1);
     fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
     //fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
-    fprintf(stderr, "valid_list_loc: %s\n", valid_list_loc);
+    fprintf(stderr, "test_list_loc: %s\n", valid_list_loc);
     srand(time(0));
 
     list *plist = get_paths(valid_list_loc);
@@ -438,7 +427,7 @@ void validate_yolt3(char *cfgfile, char *weightfile, char *valid_list_loc,
 			char *id = path;
 		    //fprintf(stderr, "path: %s\n", path);
             if (count%10 == 0){
-                fprintf(stderr, "%d, validate id: %s\n", i, id);
+                fprintf(stderr, "%d, test id: %s\n", i, id);
             }
 
             float *X = val_resized[t].data;
@@ -570,36 +559,65 @@ void run_yolt3(int argc, char **argv)
 	int len_names = (argc > 12) ? atoi(argv[12]): 0;
 	int nbands = (argc > 13) ? atoi(argv[13]): 0;
 	char *loss_file = (argc > 14) ? argv[14]: 0;
+    float min_retain_prob = (argc > 15) ? atof(argv[15]): 0.0;
+	int ngpus = (argc > 16) ? atoi(argv[16]): 0;
 
-	// get gpu list
-    char *gpu_list = find_char_arg(argc, argv, "-gpus", 0);
+	int reset_seen = 1;   // switch to reset the number of observations already seen
+
+	// turn names_str into names_list
+	fprintf(stderr, "\nRun YOLT3.C...\n");
+	fprintf(stderr, "Plot Probablility Threshold: %f\n", plot_thresh);
+	fprintf(stderr, "Label_str: %s\n", names_str);
+	fprintf(stderr, "len(names): %i\n", len_names);
+	fprintf(stderr, "num channels: %i\n", nbands);
+	fprintf(stderr, "ngpus: %i\n", ngpus);
+
+	// // get gpu list
+    //char *gpu_list = find_char_arg(argc, argv, "-gpus", 0);
+    //int ngpus = 0;
     int *gpus = 0;
     int gpu = 0;
-    int ngpus = 0;
-    if(gpu_list){
-        printf("%s\n", gpu_list);
-        int len = strlen(gpu_list);
-        ngpus = 1;
+    if(ngpus > 1){
+        // printf("%s\n", gpu_list);
+        //int len = strlen(gpu_list);
+        //ngpus = 1;
         int i;
-        for(i = 0; i < len; ++i){
-            if (gpu_list[i] == ',') ++ngpus;
-        }
+        //for(i = 0; i < len; ++i){
+        //    if (gpu_list[i] == ',') ++ngpus;
+        //}
         gpus = calloc(ngpus, sizeof(int));
         for(i = 0; i < ngpus; ++i){
-            gpus[i] = atoi(gpu_list);
-            gpu_list = strchr(gpu_list, ',')+1;
+            gpus[i] = i;
+			//gpus[i] = atoi(gpu_list);
+            //gpu_list = strchr(gpu_list, ',')+1;
         }
     } else {
         gpu = gpu_index;
         gpus = &gpu;
         ngpus = 1;
     }
-
-	fprintf(stderr, "\nRun YOLT.C...\n");
-	fprintf(stderr, "Plot Probablility Threshold: %f\n", plot_thresh);
-	fprintf(stderr, "Label_str: %s\n", names_str);
-	fprintf(stderr, "len(names): %i\n", len_names);
-	fprintf(stderr, "num channels: %i\n", nbands);
+	//     char *gpu_list = find_char_arg(argc, argv, "-gpus", 0);
+	//     int *gpus = 0;
+	//     int gpu = 0;
+	//     int ngpus = 0;
+	//     if(gpu_list){
+	//         printf("%s\n", gpu_list);
+	//         int len = strlen(gpu_list);
+	//         ngpus = 1;
+	//         int i;
+	//         for(i = 0; i < len; ++i){
+	//             if (gpu_list[i] == ',') ++ngpus;
+	//         }
+	//         gpus = calloc(ngpus, sizeof(int));
+	//         for(i = 0; i < ngpus; ++i){
+	//             gpus[i] = atoi(gpu_list);
+	//             gpu_list = strchr(gpu_list, ',')+1;
+	//         }
+	//     } else {
+	//         gpu = gpu_index;
+	//         gpus = &gpu;
+	//         ngpus = 1;
+	//     }
 
 	// turn names_str into names_list
 	char **names;
@@ -618,7 +636,7 @@ void run_yolt3(int argc, char **argv)
 	}
 
 	// train
-    if(0==strcmp(argv[2], "train")) train_yolt3(cfg, weights, train_images, results_dir, nbands, loss_file);//,
+    if(0==strcmp(argv[2], "train")) train_yolt3(cfg, weights, train_images, results_dir, nbands, loss_file, gpus, ngpus, reset_seen);
 										//0, 1, 1);
 										//gpus, ngpus, clear);						
 	

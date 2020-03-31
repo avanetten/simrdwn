@@ -110,11 +110,11 @@ void save_image_ave2(image im, char *out_dir, const char *name)
     if(!success) fprintf(stderr, "Failed to write image %s\n", buff);
 }
 
-void train_yolt2(char *cfgfile, char *weightfile, char *train_images, char *results_dir, int nbands, char *loss_file)//, int *gpus, int ngpus)//, int reset_seen)
+void train_yolt2(char *cfgfile, char *weightfile, char *train_images, char *results_dir, int nbands, char *loss_file, int *gpus, int ngpus, int reset_seen)
 {
-	int reset_seen = 1;
-	int ngpus = 1;
-	int *gpus;
+	// int reset_seen = 1;
+	// int ngpus = 2;
+	// int *gpus;
 	
     srand(time(0));
     //data_seed = time(0);
@@ -136,53 +136,78 @@ void train_yolt2(char *cfgfile, char *weightfile, char *train_images, char *resu
     fclose(lossfile);
     fprintf(stderr, "%s,%s,%s,%s\n", "Batch_Num", "BatchSize", "N_Train_Ims", "Loss");
     
-    network net = parse_network_cfg(cfgfile);
-    network *nets = calloc(ngpus, sizeof(network));
-	int i;
-	int imgs;
+//     network net = parse_network_cfg(cfgfile);
+//     network *nets = calloc(ngpus, sizeof(network));
+// 	int i;
+// 	int imgs;
+//
+//     if(ngpus == 1){
+// 		////////////////
+// 		// single gpu
+// 	    //network net = parse_network_cfg(cfgfile);
+// 	    if(weightfile){
+// 	        load_weights(&net, weightfile);
+// 	    }
+//
+// 	    //if using pretrained network, reset net.seen
+// 		if(reset_seen){
+// 			*net.seen = 0;
+// 		}
+//
+// 	    imgs = net.batch*net.subdivisions;
+// 	    i = *net.seen/imgs;
+//
+// 		////////////////////
+//     } else {
+// 		/////////////////////
+// 		// multi gpu
+// 	    network *nets = calloc(ngpus, sizeof(network));
+//
+// 	    srand(time(0));
+// 	    int seed = rand();
+// 	    int i;
+// 	    for(i = 0; i < ngpus; ++i){
+// 	        srand(seed);
+// #ifdef GPU
+// 	        cuda_set_device(gpus[i]);
+// #endif
+// 	        nets[i] = parse_network_cfg(cfgfile);
+// 	        if(weightfile){
+// 	            load_weights(&nets[i], weightfile);
+// 	        }
+// 	        if(reset_seen) *nets[i].seen = 0;
+// 	        nets[i].learning_rate *= ngpus;
+// 	    }
+// 	    srand(time(0));
+// 	    network net = nets[0];
+//
+// 	    imgs = net.batch * net.subdivisions * ngpus;
+//     }
+// 	////////////////////
 	
-    if(ngpus == 1){
-		////////////////
-		// single gpu
-	    //network net = parse_network_cfg(cfgfile);
-	    if(weightfile){
-	        load_weights(&net, weightfile);
-	    }
+    network *nets = calloc(ngpus, sizeof(network));
 
-	    //if using pretrained network, reset net.seen
-		if(reset_seen){
-			*net.seen = 0;
-		}
-
-	    imgs = net.batch*net.subdivisions;
-	    i = *net.seen/imgs;
-		////////////////////				
-    } else {
-		/////////////////////
-		// multi gpu
-	    network *nets = calloc(ngpus, sizeof(network));
-
-	    srand(time(0));
-	    int seed = rand();
-	    int i;
-	    for(i = 0; i < ngpus; ++i){
-	        srand(seed);
+    srand(time(0));
+    int seed = rand();
+    int i;
+    for(i = 0; i < ngpus; ++i){
+        srand(seed);
 #ifdef GPU
-	        cuda_set_device(gpus[i]);
+        cuda_set_device(gpus[i]);
 #endif
-	        nets[i] = parse_network_cfg(cfgfile);
-	        if(weightfile){
-	            load_weights(&nets[i], weightfile);
-	        }
-	        if(reset_seen) *nets[i].seen = 0;
-	        nets[i].learning_rate *= ngpus;
-	    }
-	    srand(time(0));
-	    network net = nets[0];
-
-	    imgs = net.batch * net.subdivisions * ngpus;
-	////////////////////		
+        nets[i] = parse_network_cfg(cfgfile);
+        if(weightfile){
+            load_weights(&nets[i], weightfile);
+        }
+        if(reset_seen) *nets[i].seen = 0;
+        nets[i].learning_rate *= ngpus;
     }
+    srand(time(0));
+    network net = nets[0];
+	
+    int imgs = net.batch * net.subdivisions * ngpus;
+	i = *net.seen/imgs;
+	
 	
     fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     fprintf(stderr, "\n\n\n\n\n\nNum images = %d,\ni= %d\n", imgs, i);
@@ -365,7 +390,7 @@ void validate_yolt2(char *cfgfile, char *weightfile, char *valid_list_loc,
     }
     set_batch_network(&net, 1);
     fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
-    fprintf(stderr, "valid_list_loc: %s\n", valid_list_loc);
+    fprintf(stderr, "test_list_loc: %s\n", valid_list_loc);
 
     srand(time(0));
 
@@ -374,6 +399,8 @@ void validate_yolt2(char *cfgfile, char *weightfile, char *valid_list_loc,
 
     layer l = net.layers[net.n-1];
     int classes = l.classes;
+	fprintf(stderr, "n classes %d\n", classes);
+	
     //int square = l.sqrt;
     //int side = l.side;
 
@@ -433,7 +460,9 @@ void validate_yolt2(char *cfgfile, char *weightfile, char *valid_list_loc,
 	//clock_t ticks;
 
     for(i = nthreads; i < m+nthreads; i += nthreads){
-        fprintf(stderr, "%d / %d \n", i, m);
+		if (i % 50 == 0){
+        	fprintf(stderr, "%d / %d \n", i, m);
+		}
         for(t = 0; t < nthreads && i+t-nthreads < m; ++t){
             pthread_join(thr[t], 0);
             val[t] = buf[t];
@@ -453,8 +482,10 @@ void validate_yolt2(char *cfgfile, char *weightfile, char *valid_list_loc,
 			char *id = path;
 		    //fprintf(stderr, "path: %s\n", path);
 			
-		    fprintf(stderr, "validate id: %s\n", id);
-            //fprintf(stderr, "test0\n");
+			if (i % 50 == 0){
+				fprintf(stderr, "test id: %s\n", id);
+            	//fprintf(stderr, "test0\n");
+			}
 
             float *X = val_resized[t].data;
             float *predictions = network_predict(net, X);
@@ -492,14 +523,16 @@ void validate_yolt2(char *cfgfile, char *weightfile, char *valid_list_loc,
 
         }
     }
+
+	//fprintf(stderr, "test_check_0\n");
     for(j = 0; j < classes; ++j){
+		// fprintf(stderr, "close class: %d\n", j);
         if(fps) fclose(fps[j]);
     }
-	
+	//fprintf(stderr, "test_check_1\n");
 	//time(&stop);
     clock_gettime(CLOCK_MONOTONIC, &tend);
-	
-	
+
 	fprintf(stderr, "Total Detection Time: %.5f Seconds\n", ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - 
            ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
 	//fprintf(stderr, "Total Detection Time: %.4f Seconds\n", (double)(time(0) - start));
@@ -621,13 +654,17 @@ void run_yolt2(int argc, char **argv)
 	int nbands = (argc > 13) ? atoi(argv[13]): 0;
 	char *loss_file = (argc > 14) ? argv[14]: 0;
     float min_retain_prob = (argc > 15) ? atof(argv[15]): 0.0;
+	int ngpus = (argc > 16) ? atoi(argv[16]): 0;
 
+	int reset_seen = 1;   // switch to reset the number of observations already seen
+	
 	// turn names_str into names_list
-	fprintf(stderr, "\nRun YOLT.C...\n");
+	fprintf(stderr, "\nRun YOLT2.C...\n");
 	fprintf(stderr, "Plot Probablility Threshold: %f\n", plot_thresh);
 	fprintf(stderr, "Label_str: %s\n", names_str);
 	fprintf(stderr, "len(names): %i\n", len_names);
 	fprintf(stderr, "num channels: %i\n", nbands);
+	fprintf(stderr, "ngpus: %i\n", ngpus);
 
 	char **names;
 	if(len_names > 0){
@@ -644,6 +681,30 @@ void run_yolt2(int argc, char **argv)
 		//fprintf(stderr, "Load Network:\n");
 	}
 
+    //char *gpu_list = find_char_arg(argc, argv, "-gpus", 0);
+    //int ngpus = 0;
+    int *gpus = 0;
+    int gpu = 0;
+    if(ngpus > 1){
+        // printf("%s\n", gpu_list);
+        //int len = strlen(gpu_list);
+        //ngpus = 1;
+        int i;
+        //for(i = 0; i < len; ++i){
+        //    if (gpu_list[i] == ',') ++ngpus;
+        //}
+        gpus = calloc(ngpus, sizeof(int));
+        for(i = 0; i < ngpus; ++i){
+            gpus[i] = i;
+			//gpus[i] = atoi(gpu_list);
+            //gpu_list = strchr(gpu_list, ',')+1;
+        }
+    } else {
+        gpu = gpu_index;
+        gpus = &gpu;
+        ngpus = 1;
+    }
+
     if(0==strcmp(argv[2], "test")){
 		//load  labels images
 		image voc_labels[len_names];
@@ -658,7 +719,7 @@ void run_yolt2(int argc, char **argv)
 		test_yolt2(cfg, weights, test_filename, plot_thresh, nms_thresh, names, voc_labels, len_names, 
 				  nbands, results_dir);
     } 
-    else if(0==strcmp(argv[2], "train")) train_yolt2(cfg, weights, train_images, results_dir, nbands, loss_file);
+    else if(0==strcmp(argv[2], "train")) train_yolt2(cfg, weights, train_images, results_dir, nbands, loss_file, gpus, ngpus, reset_seen);
     else if(0==strcmp(argv[2], "valid")) validate_yolt2(cfg, weights, valid_list_loc, 
 													    nms_thresh, names, results_dir, nbands,
                                                         min_retain_prob);
