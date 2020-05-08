@@ -1,5 +1,4 @@
-# inspired by sn4_baseline
-FROM nvidia/cuda:9.0-devel-ubuntu16.04
+FROM nvidia/cuda:9.2-devel-ubuntu16.04
 MAINTAINER avanetten
 
 # IF YOU WANT PROGRESS PRINTED TO TERMINAL
@@ -33,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
             libcudnn7-dev=$CUDNN_VERSION-1+cuda9.0 && \
     apt-mark hold libcudnn7 && \
     rm -rf /var/lib/apt/lists/*
-
+	
 # install requirements
 RUN apt-get update \
   	&& apt-get install -y --no-install-recommends \
@@ -68,24 +67,18 @@ SHELL ["/bin/bash", "-c"]
 ENV PATH /opt/conda/bin:$PATH
 
 # install anaconda
-# https://repo.continuum.io/miniconda/
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.6.14-Linux-x86_64.sh -O ~/miniconda.sh && \
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh -O ~/miniconda.sh && \
     /bin/bash ~/miniconda.sh -b -p /opt/conda && \
     rm ~/miniconda.sh && \
     /opt/conda/bin/conda clean -tipsy && \
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
     echo "conda activate base" >> ~/.bashrc
-# ENV TINI_VERSION v0.16.1
-ENV TINI_VERSION v0.18.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /usr/bin/tini
-RUN chmod +x /usr/bin/tini
 
-# use conda-forge instead of default channel
-RUN conda config --add channels conda-forge 
-	# && \
-	# conda update conda
-    # conda config --remove channels defaults && \
+# prepend pytorch and conda-forge before default channel
+RUN conda update conda && \
+    conda config --prepend channels conda-forge
+
 
 # set up conda environment and add to $PATH
 RUN conda create -n simrdwn python=3.6 \
@@ -103,49 +96,54 @@ RUN source activate simrdwn \
 
 RUN source activate simrdwn \
 	&& conda install -n simrdwn \
-				  libgdal=2.4.1 \
-    			  gdal=2.4.1 \
-	              geopandas=0.5.0 \
-				  opencv=4.1.0 \
-	              affine=2.2.2 \
-	              pyproj=1.9.6 \
-	              pyhamcrest=1.9.0 \
-	              cython=0.29.10 \
-				  contextlib2=0.5.5 \
-	              ncurses=6.1 \
-	              jupyter=1.0.0 \
-	              jupyterlab=0.35.6 \
-	              ipykernel=5.1.1 \
-	              matplotlib=3.1.0 \
-	              numpy=1.16.4 \
-	              pandas=0.24.2 \
-	              pillow=6.0.0 \
-	              pip=19.1.1 \
-	              scipy=1.3.0 \
-	              scikit-image=0.15.0 \
-	              scikit-learn=0.21.2 \
-	              shapely=1.6.4 \
-	              rtree=0.8.3 \
-	              testpath=0.4.2 \
-	              tqdm=4.32.1 \
-				  statsmodels=0.10.1 \
+    			  gdal=2.4.2 \				 
+			   	  geopandas=0.6.3 \
+				  fiona \
+				  rasterio \
+	     	      awscli \
+	              affine \
+	              pyproj \
+	              pyhamcrest \
+	              cython \
+	              fiona \
+	              h5py \
+	              ncurses \
+	              jupyter \
+	              jupyterlab \
+	              ipykernel \
+	              libgdal \
+	              matplotlib \
+		          ncurses \
+	              numpy \
+				  statsmodels \
+	              pandas \
+	              pillow \
+	              pip \
+	              scipy \
+	              scikit-image \
+	              scikit-learn \
+	              shapely \
+	              rtree \
+	              testpath \
+	              tqdm \
+				  opencv \
+				  statsmodels \
+				  testpath \
+				  rtree \				  
 	&& conda clean -p \
 	&& conda clean -t \
 	&& conda clean --yes --all 
-#	%% conda build purge-all \
 
-# Below is a hack to get around conda issues (2019-07-19)
-RUN source activate simrdwn \
-    && conda install -n simrdwn \
-				-c conda-forge rasterio=1.0.24 \
-	&& conda clean -p \
-	&& conda clean -t \
-	&& conda clean --yes --all 
+# # Below is a hack to get around conda issues (2019-07-19)
+# RUN source activate simrdwn \
+#     && conda install -n simrdwn \
+# 				-c conda-forge rasterio=1.0.24 \
+# 	&& conda clean -p \
+# 	&& conda clean -t \
+# 	&& conda clean --yes --all
 				  
 # tf object detection api
 RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
-WORKDIR /tensorflow/models/research/
-RUN git checkout r1.13.0
 #WORKDIR /tensorflow/models/research/
 #RUN protoc object_detection/protos/*.proto --python_out=.
 # WORKDIR /tensorflow/models/research/
@@ -192,11 +190,13 @@ ENV PYTHONPATH $PYTHONPATH:/tensorflow/models/:/tensorflow/models/research/slim
 RUN source activate simrdwn && python -m ipykernel.kernelspec
 RUN python -m ipykernel.kernelspec
 
+# clone simrdwn
+RUN mkdir -p /opt/
+RUN git clone https://github.com/avanetten/simrdwn.git /opt/simrdwn/
 
 ###################
+WORKDIR "/opt/simrdwn"
 # Set up our notebook config.
-WORKDIR /
-# TensorBoard
 # open ports for jupyterlab and tensorboard
 EXPOSE 8888 6006
 RUN ["/bin/bash"]
